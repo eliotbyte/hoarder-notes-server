@@ -49,10 +49,38 @@ This command will create the necessary tables in the database.
 If you need to create a new migration to update the database schema, use the following command, replacing `MigrationName` with a descriptive name for your migration:
 
 ```bash
-npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d ./data-source.ts -n MigrationName
+npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate src/migration/MigrationName -d ./data-source.ts
 ```
 
-This command will create a new migration file in the `src/migration` directory.
+#### Important Steps if No Changes are Detected
+
+1. **Ensure All Entities are Registered**: Verify that all entities are added in `data-source.ts` in the `entities` array. Example:
+
+   ```typescript
+   import { DataSource } from 'typeorm';
+   import { User } from './src/entities/user.entity';
+   import { Note } from './src/entities/note.entity';
+   import { Tag } from './src/entities/tag.entity';
+   import { NoteTag } from './src/entities/note_tag.entity';
+
+   export const AppDataSource = new DataSource({
+     type: 'postgres',
+     host: 'localhost',
+     port: 5433,
+     username: 'postgres',
+     password: 'postgres',
+     database: 'hoarder_notes_db',
+     entities: [User, Note, Tag, NoteTag],
+     migrations: ['src/migration/*.ts'],
+     synchronize: false,
+   });
+   ```
+
+2. **Retry Migration Generation**: After verifying the entity registrations, rerun the migration generation command:
+
+   ```bash
+   npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate src/migration/MigrationName -d ./data-source.ts
+   ```
 
 ## Additional Configuration
 
