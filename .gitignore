@@ -27,3 +27,6 @@ coverage/
 # Miscellaneous
 .DS_Store
 Thumbs.db
+
+# Local Docker override
+docker-compose.override.yml

@@ -1,0 +1,14 @@
+{
+	"type": "postgres",
+	"host": "localhost",
+	"port": 5433,
+	"username": "postgres",
+	"password": "postgres",
+	"database": "hoarder_notes_db",
+	"entities": ["dist/**/*.entity.js"],
+	"migrations": ["dist/migration/*.js"],
+	"cli": {
+	  "migrationsDir": "src/migration"
+	}
+  }
+  
