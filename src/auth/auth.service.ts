@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcryptjs';
@@ -28,13 +28,20 @@ export class AuthService {
   }
 
   async register(userData: any) {
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-    const user = await this.usersService.create({
-      ...userData,
-      password_hash: hashedPassword,
-    });
-    const { password_hash, ...result } = user;
-    void password_hash;
-    return result;
+    try {
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      const user = await this.usersService.create({
+        ...userData,
+        password_hash: hashedPassword,
+      });
+      const { password_hash, ...result } = user;
+      void password_hash;
+      return result;
+    } catch (error) {
+      if (error.code === '23505') {
+        throw new ConflictException('Username already exists');
+      }
+      throw error;
+    }
   }
 }
