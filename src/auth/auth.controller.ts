@@ -6,14 +6,14 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  async register(@Body() userDto: { username: string; password: string }) {
+  async register(@Body() userDto: { name: string; password: string }) {
     return this.authService.register(userDto);
   }
 
   @Post('login')
-  async login(@Body() userDto: { username: string; password: string }) {
+  async login(@Body() userDto: { name: string; password: string }) {
     const user = await this.authService.validateUser(
-      userDto.username,
+      userDto.name,
       userDto.password,
     );
     if (!user) {
