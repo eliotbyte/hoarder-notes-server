@@ -14,6 +14,12 @@ This project sets up a NestJS API server with a PostgreSQL database using Docker
 npm install -g @nestjs/cli
 ```
 
+- Set up a `.env` file: For security and configuration purposes, this project requires a `.env` file to store environment variables.
+  - To generate a `JWT_SECRET` for the `.env` file, you can use the following command in Node.js:
+    ```javascript
+    require('crypto').randomBytes(32).toString('base64');
+    ```
+
 ### 1. Install Dependencies
 
 Install all the necessary packages by running:
