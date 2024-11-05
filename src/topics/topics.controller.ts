@@ -44,18 +44,11 @@ export class TopicsController {
     return this.topicsService.deleteTopic(userId, topicId);
   }
 
-  @Get(':spaceId')
-  async getTopicsBySpace(
-    @Req() req,
-    @Param('spaceId') spaceId: number,
-    @Body() query: { access_level?: string },
-  ) {
+  // Modified to handle query parameters
+  @Get('space/:spaceId')
+  async getTopicsBySpace(@Req() req, @Param('spaceId') spaceId: number) {
     const userId = req.user.userId;
-    return this.topicsService.getTopicsBySpace(
-      userId,
-      spaceId,
-      query.access_level,
-    );
+    return this.topicsService.getTopicsBySpace(userId, Number(spaceId));
   }
 
   @Put(':id/permissions')

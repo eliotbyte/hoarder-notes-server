@@ -113,4 +113,10 @@ export class SpacesController {
       Number(spaceId),
     );
   }
+
+  @Get()
+  async getSpaces(@Req() req) {
+    const userId = req.user.userId;
+    return this.spacesService.getSpacesForUser(userId);
+  }
 }

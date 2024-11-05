@@ -436,6 +436,35 @@ export class SpacesService {
     return { message: 'Participant removed successfully' };
   }
 
+  async getSpacesForUser(userId: number): Promise<any[]> {
+    // Fetch the spaces where the user has a role
+    const userSpaces = await this.userSpaceRolesRepository.find({
+      where: { user_id: userId },
+      relations: ['space', 'role'],
+    });
+
+    const result = [];
+
+    for (const userSpace of userSpaces) {
+      // Get permissions
+      const permissions = await this.userSpacePermissionsRepository.find({
+        where: { user_id: userId, space_id: userSpace.space_id },
+        relations: ['permission'],
+      });
+
+      const permissionNames = permissions.map((p) => p.permission.name);
+
+      result.push({
+        id: userSpace.space.id,
+        name: userSpace.space.name,
+        role: userSpace.role.name,
+        permissions: permissionNames,
+      });
+    }
+
+    return result;
+  }
+
   private async hasSpacePermission(
     userId: number,
     spaceId: number,

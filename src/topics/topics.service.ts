@@ -125,33 +125,72 @@ export class TopicsService {
     return await this.topicsRepository.save(topic);
   }
 
-  async getTopicsBySpace(
-    userId: number,
-    spaceId: number,
-    accessLevel?: string,
-  ): Promise<Topic[]> {
+  async getTopicsBySpace(userId: number, spaceId: number): Promise<any[]> {
     // Check if user is part of the space
     const userRole = await this.userSpaceRolesRepository.findOne({
       where: { user_id: userId, space_id: spaceId },
+      relations: ['role'],
     });
 
     if (!userRole) {
       throw new ForbiddenException('You are not a participant of this space');
     }
 
-    // Build the query for topics based on access level
-    const queryBuilder = this.topicsRepository
-      .createQueryBuilder('topic')
-      .where('topic.space_id = :spaceId', { spaceId })
-      .andWhere('topic.is_deleted = false');
+    // Fetch all topics in the space
+    const topics = await this.topicsRepository.find({
+      where: { space_id: spaceId, is_deleted: false },
+      relations: ['accessLevel'],
+    });
 
-    if (accessLevel) {
-      queryBuilder.andWhere('topic.access_level_id = :accessLevel', {
-        accessLevel,
-      });
+    const result = [];
+
+    for (const topic of topics) {
+      let canRead = false;
+
+      if (topic.accessLevel.name !== 'private') {
+        canRead = true;
+      } else {
+        // Check if user has 'read' permission in the topic
+        const readPermission = await this.topicPermissionsRepository.findOne({
+          where: { name: 'read' },
+        });
+
+        if (readPermission) {
+          const userPermission =
+            await this.userTopicPermissionsRepository.findOne({
+              where: {
+                user_id: userId,
+                topic_id: topic.id,
+                permission_id: readPermission.id,
+              },
+            });
+
+          if (userPermission) {
+            canRead = true;
+          }
+        }
+      }
+
+      if (canRead) {
+        // Get user's permissions in the topic
+        const userPermissions = await this.userTopicPermissionsRepository.find({
+          where: { user_id: userId, topic_id: topic.id },
+          relations: ['permission'],
+        });
+
+        const permissionNames = userPermissions.map(
+          (perm) => perm.permission.name,
+        );
+
+        result.push({
+          id: topic.id,
+          name: topic.name,
+          permissions: permissionNames,
+        });
+      }
     }
 
-    return await queryBuilder.getMany();
+    return result;
   }
 
   async editUserTopicPermissions(
