@@ -12,6 +12,7 @@ import { UserSpacePermission } from '../entities/user_space_permission.entity';
 import { UserRole } from '../entities/user_role.entity';
 import { SpacePermission } from '../entities/space_permission.entity';
 import { User } from '../entities/user.entity';
+import { TopicAccessLevel } from '../entities/topic_access_level.entity';
 
 @Injectable()
 export class SpacesService {
@@ -28,6 +29,8 @@ export class SpacesService {
     private readonly spacePermissionsRepository: Repository<SpacePermission>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(TopicAccessLevel)
+    private readonly topicAccessLevelRepository: Repository<TopicAccessLevel>,
   ) {}
 
   async createSpace(userId: number, createSpaceDto: any): Promise<any> {
@@ -443,6 +446,12 @@ export class SpacesService {
       relations: ['space', 'role'],
     });
 
+    // Fetch 'public' and 'private' access levels
+    const [publicAccessLevel, privateAccessLevel] =
+      await this.topicAccessLevelRepository.find({
+        where: { name: In(['public', 'private']) },
+      });
+
     const result = [];
 
     for (const userSpace of userSpaces) {
@@ -454,11 +463,29 @@ export class SpacesService {
 
       const permissionNames = permissions.map((p) => p.permission.name);
 
+      // Determine topic_access_levels
+      const topicAccessLevels = [];
+
+      if (publicAccessLevel) {
+        topicAccessLevels.push({
+          id: publicAccessLevel.id,
+          name: publicAccessLevel.name,
+        });
+      }
+
+      if (privateAccessLevel && permissionNames.includes('create_private')) {
+        topicAccessLevels.push({
+          id: privateAccessLevel.id,
+          name: privateAccessLevel.name,
+        });
+      }
+
       result.push({
         id: userSpace.space.id,
         name: userSpace.space.name,
         role: userSpace.role.name,
         permissions: permissionNames,
+        topic_access_levels: topicAccessLevels,
       });
     }
 
