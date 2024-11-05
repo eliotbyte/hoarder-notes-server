@@ -6,13 +6,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Space } from '../entities/space.entity';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import { UserSpaceRole } from '../entities/user_space_role.entity';
-import { UserSpacePermission } from '../entities/user_space_permission.entity';
 import { UserRole } from '../entities/user_role.entity';
 import { SpacePermission } from '../entities/space_permission.entity';
+import { RolePermission } from '../entities/role_permission.entity';
 import { User } from '../entities/user.entity';
-import { TopicAccessLevel } from '../entities/topic_access_level.entity';
+import { SPACE_PERMISSIONS_IDS } from '../common/constants/space_permissions.constants';
 
 @Injectable()
 export class SpacesService {
@@ -21,17 +21,61 @@ export class SpacesService {
     private readonly spacesRepository: Repository<Space>,
     @InjectRepository(UserSpaceRole)
     private readonly userSpaceRolesRepository: Repository<UserSpaceRole>,
-    @InjectRepository(UserSpacePermission)
-    private readonly userSpacePermissionsRepository: Repository<UserSpacePermission>,
     @InjectRepository(UserRole)
     private readonly userRolesRepository: Repository<UserRole>,
     @InjectRepository(SpacePermission)
     private readonly spacePermissionsRepository: Repository<SpacePermission>,
+    @InjectRepository(RolePermission)
+    private readonly rolePermissionsRepository: Repository<RolePermission>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-    @InjectRepository(TopicAccessLevel)
-    private readonly topicAccessLevelRepository: Repository<TopicAccessLevel>,
   ) {}
+
+  async hasPermission(
+    userId: number,
+    spaceId: number,
+    permissionName: string,
+  ): Promise<boolean> {
+    const userSpaceRole = await this.userSpaceRolesRepository.findOne({
+      where: { user_id: userId, space_id: spaceId },
+      relations: ['role'],
+    });
+
+    if (!userSpaceRole) {
+      return false;
+    }
+
+    const permissionId = SPACE_PERMISSIONS_IDS[permissionName];
+
+    if (!permissionId) {
+      return false;
+    }
+
+    const rolePermission = await this.rolePermissionsRepository.findOne({
+      where: {
+        role_id: userSpaceRole.role_id,
+        permission_id: permissionId,
+      },
+    });
+
+    return !!rolePermission;
+  }
+
+  async getUserSpaceRole(
+    userId: number,
+    spaceId: number,
+  ): Promise<UserRole | null> {
+    const userSpaceRole = await this.userSpaceRolesRepository.findOne({
+      where: { user_id: userId, space_id: spaceId },
+      relations: ['role'],
+    });
+
+    if (userSpaceRole) {
+      return userSpaceRole.role;
+    } else {
+      return null;
+    }
+  }
 
   async createSpace(userId: number, createSpaceDto: any): Promise<any> {
     const { name } = createSpaceDto;
@@ -43,33 +87,73 @@ export class SpacesService {
     });
     const savedSpace = await this.spacesRepository.save(space);
 
-    // Assign owner role to the user in the space
-    const ownerRole = await this.userRolesRepository.findOne({
-      where: { name: 'owner' },
-    });
-    if (!ownerRole) {
-      throw new NotFoundException('Owner role not found');
-    }
+    // Define default roles and their permissions
+    const defaultRoles = [
+      {
+        name: 'owner',
+        is_custom: false,
+        is_default: true,
+        permissions: Object.keys(SPACE_PERMISSIONS_IDS), // All permissions
+      },
+      {
+        name: 'moderator',
+        is_custom: false,
+        is_default: true,
+        permissions: [
+          'CHANGE_USER_ROLES',
+          'CREATE_NOTES',
+          'EDIT_NOTES',
+          'DELETE_NOTES',
+          'READ_NOTES',
+          'CREATE_TOPICS',
+          'EDIT_TOPICS',
+          'DELETE_TOPICS',
+        ],
+      },
+      {
+        name: 'member',
+        is_custom: false,
+        is_default: true,
+        permissions: [
+          'CREATE_NOTES',
+          'EDIT_NOTES',
+          'DELETE_NOTES',
+          'READ_NOTES',
+        ],
+      },
+    ];
 
-    const userSpaceRole = this.userSpaceRolesRepository.create({
-      user_id: userId,
-      space_id: savedSpace.id,
-      role_id: ownerRole.id,
-    });
-    await this.userSpaceRolesRepository.save(userSpaceRole);
-
-    // Assign all permissions to the user in the space
-    const permissions = await this.spacePermissionsRepository.find();
-
-    const userSpacePermissions = permissions.map((permission) =>
-      this.userSpacePermissionsRepository.create({
-        user_id: userId,
+    // Create roles and assign permissions
+    for (const roleData of defaultRoles) {
+      const role = this.userRolesRepository.create({
+        name: roleData.name,
+        is_custom: roleData.is_custom,
+        is_default: roleData.is_default,
         space_id: savedSpace.id,
-        permission_id: permission.id,
-      }),
-    );
+      });
+      const savedRole = await this.userRolesRepository.save(role);
 
-    await this.userSpacePermissionsRepository.save(userSpacePermissions);
+      // Assign permissions to role
+      const rolePermissions = roleData.permissions.map((permName) => {
+        const permissionId = SPACE_PERMISSIONS_IDS[permName];
+        return this.rolePermissionsRepository.create({
+          role_id: savedRole.id,
+          permission_id: permissionId,
+        });
+      });
+
+      await this.rolePermissionsRepository.save(rolePermissions);
+
+      // If role is 'owner', assign it to the user
+      if (roleData.name === 'owner') {
+        const userSpaceRole = this.userSpaceRolesRepository.create({
+          user_id: userId,
+          space_id: savedSpace.id,
+          role_id: savedRole.id,
+        });
+        await this.userSpaceRolesRepository.save(userSpaceRole);
+      }
+    }
 
     return savedSpace;
   }
@@ -86,11 +170,11 @@ export class SpacesService {
       throw new NotFoundException('Space not found');
     }
 
-    // Check if user has 'edit' permission in the space
-    const hasPermission = await this.hasSpacePermission(
+    // Check if user has 'EDIT_SPACES' permission in the space
+    const hasPermission = await this.hasPermission(
       userId,
       spaceId,
-      'edit',
+      'EDIT_SPACES',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -112,11 +196,11 @@ export class SpacesService {
       throw new NotFoundException('Space not found');
     }
 
-    // Check if user has 'delete' permission in the space
-    const hasPermission = await this.hasSpacePermission(
+    // Check if user has 'DELETE_SPACES' permission in the space
+    const hasPermission = await this.hasPermission(
       userId,
       spaceId,
-      'delete',
+      'DELETE_SPACES',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -138,11 +222,11 @@ export class SpacesService {
       throw new NotFoundException('Space not found');
     }
 
-    // Check if user has 'edit' permission in the space
-    const hasPermission = await this.hasSpacePermission(
+    // Check if user has 'EDIT_SPACES' permission in the space
+    const hasPermission = await this.hasPermission(
       userId,
       spaceId,
-      'edit',
+      'EDIT_SPACES',
     );
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -174,14 +258,13 @@ export class SpacesService {
     });
 
     // Organize participants by role
-    const result = {
-      owner: [],
-      moderator: [],
-      member: [],
-    };
+    const result = {};
 
     for (const participant of participants) {
       const roleName = participant.role.name;
+      if (!result[roleName]) {
+        result[roleName] = [];
+      }
       result[roleName].push({
         id: participant.user.id,
         name: participant.user.name,
@@ -191,120 +274,24 @@ export class SpacesService {
     return result;
   }
 
-  async getUserPermissions(
-    currentUserId: number,
-    targetUserId: number,
-    spaceId: number,
-  ): Promise<any> {
-    // Check if current user can view permissions
-    const currentUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: currentUserId, space_id: spaceId },
-      relations: ['role'],
-    });
-
-    if (!currentUserRole) {
-      throw new ForbiddenException('You are not a participant of this space');
-    }
-
-    const targetUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: targetUserId, space_id: spaceId },
-      relations: ['role'],
-    });
-
-    if (!targetUserRole) {
-      throw new NotFoundException('User not found in this space');
-    }
-
-    if (
-      currentUserId !== targetUserId &&
-      !['owner', 'moderator'].includes(currentUserRole.role.name)
-    ) {
-      throw new ForbiddenException(
-        'You cannot view permissions of other users',
-      );
-    }
-
-    // Get permissions
-    const permissions = await this.userSpacePermissionsRepository.find({
-      where: { user_id: targetUserId, space_id: spaceId },
-      relations: ['permission'],
-    });
-
-    return permissions.map((perm) => perm.permission.name);
-  }
-
-  async editUserPermissions(
-    currentUserId: number,
-    targetUserId: number,
-    spaceId: number,
-    permissions: string[],
-  ): Promise<any> {
-    // Only owner or moderator can edit permissions
-    const currentUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: currentUserId, space_id: spaceId },
-      relations: ['role'],
-    });
-
-    if (
-      !currentUserRole ||
-      !['owner', 'moderator'].includes(currentUserRole.role.name)
-    ) {
-      throw new ForbiddenException('You cannot edit permissions in this space');
-    }
-
-    // Moderators cannot edit owner's permissions
-    const targetUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: targetUserId, space_id: spaceId },
-      relations: ['role'],
-    });
-
-    if (
-      targetUserRole.role.name === 'owner' &&
-      currentUserRole.role.name !== 'owner'
-    ) {
-      throw new ForbiddenException('You cannot edit permissions of the owner');
-    }
-
-    // Update permissions
-    await this.userSpacePermissionsRepository.delete({
-      user_id: targetUserId,
-      space_id: spaceId,
-    });
-
-    const allPermissions = await this.spacePermissionsRepository.find({
-      where: { name: In(permissions) },
-    });
-
-    const newPermissions = allPermissions.map((permission) =>
-      this.userSpacePermissionsRepository.create({
-        user_id: targetUserId,
-        space_id: spaceId,
-        permission_id: permission.id,
-      }),
-    );
-
-    await this.userSpacePermissionsRepository.save(newPermissions);
-
-    return { message: 'Permissions updated successfully' };
-  }
-
   async editUserRole(
     currentUserId: number,
     targetUserId: number,
     spaceId: number,
     roleName: string,
   ): Promise<any> {
-    // Only owner can edit roles
-    const currentUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: currentUserId, space_id: spaceId },
-      relations: ['role'],
-    });
+    // Check if current user has 'CHANGE_USER_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      currentUserId,
+      spaceId,
+      'CHANGE_USER_ROLES',
+    );
 
-    if (!currentUserRole || currentUserRole.role.name !== 'owner') {
-      throw new ForbiddenException('Only the owner can edit user roles');
+    if (!hasPermission) {
+      throw new ForbiddenException('You cannot edit user roles in this space');
     }
 
-    // Cannot change owner's role
+    // Get target user's role
     const targetUserRole = await this.userSpaceRolesRepository.findOne({
       where: { user_id: targetUserId, space_id: spaceId },
       relations: ['role'],
@@ -314,13 +301,11 @@ export class SpacesService {
       throw new NotFoundException('User not found in this space');
     }
 
-    if (targetUserRole.role.name === 'owner') {
-      throw new ForbiddenException("Cannot change the owner's role");
-    }
-
+    // Get the new role
     const newRole = await this.userRolesRepository.findOne({
-      where: { name: roleName },
+      where: { name: roleName, space_id: spaceId },
     });
+
     if (!newRole) {
       throw new NotFoundException('Role not found');
     }
@@ -336,16 +321,14 @@ export class SpacesService {
     targetUserId: number,
     spaceId: number,
   ): Promise<any> {
-    // Only owner and moderator can add participants
-    const currentUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: currentUserId, space_id: spaceId },
-      relations: ['role'],
-    });
+    // Check if current user has 'CHANGE_USER_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      currentUserId,
+      spaceId,
+      'CHANGE_USER_ROLES',
+    );
 
-    if (
-      !currentUserRole ||
-      !['owner', 'moderator'].includes(currentUserRole.role.name)
-    ) {
+    if (!hasPermission) {
       throw new ForbiddenException('You cannot add participants to this space');
     }
 
@@ -368,9 +351,9 @@ export class SpacesService {
       );
     }
 
-    // Assign 'member' role
+    // Assign default role (member)
     const memberRole = await this.userRolesRepository.findOne({
-      where: { name: 'member' },
+      where: { name: 'member', space_id: spaceId },
     });
     if (!memberRole) {
       throw new NotFoundException('Member role not found');
@@ -392,16 +375,14 @@ export class SpacesService {
     targetUserId: number,
     spaceId: number,
   ): Promise<any> {
-    // Only owner and moderator can remove participants
-    const currentUserRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: currentUserId, space_id: spaceId },
-      relations: ['role'],
-    });
+    // Check if current user has 'CHANGE_USER_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      currentUserId,
+      spaceId,
+      'CHANGE_USER_ROLES',
+    );
 
-    if (
-      !currentUserRole ||
-      !['owner', 'moderator'].includes(currentUserRole.role.name)
-    ) {
+    if (!hasPermission) {
       throw new ForbiddenException(
         'You cannot remove participants from this space',
       );
@@ -410,31 +391,14 @@ export class SpacesService {
     // Get target user's role
     const targetUserRole = await this.userSpaceRolesRepository.findOne({
       where: { user_id: targetUserId, space_id: spaceId },
-      relations: ['role'],
     });
 
     if (!targetUserRole) {
       throw new NotFoundException('User not found in this space');
     }
 
-    if (currentUserRole.role.name === 'moderator') {
-      if (targetUserRole.role.name !== 'member') {
-        throw new ForbiddenException('Moderators can only remove members');
-      }
-    }
-
-    if (currentUserRole.role.name === 'owner') {
-      if (targetUserRole.role.name === 'owner') {
-        throw new ForbiddenException('Owner cannot remove themselves');
-      }
-    }
-
-    // Remove user from space roles and permissions
+    // Remove user from space roles
     await this.userSpaceRolesRepository.delete({ id: targetUserRole.id });
-    await this.userSpacePermissionsRepository.delete({
-      user_id: targetUserId,
-      space_id: spaceId,
-    });
 
     return { message: 'Participant removed successfully' };
   }
@@ -446,72 +410,106 @@ export class SpacesService {
       relations: ['space', 'role'],
     });
 
-    // Fetch 'public' and 'private' access levels
-    const [publicAccessLevel, privateAccessLevel] =
-      await this.topicAccessLevelRepository.find({
-        where: { name: In(['public', 'private']) },
-      });
-
     const result = [];
 
     for (const userSpace of userSpaces) {
-      // Get permissions
-      const permissions = await this.userSpacePermissionsRepository.find({
-        where: { user_id: userId, space_id: userSpace.space_id },
+      // Get permissions assigned to the role
+      const rolePermissions = await this.rolePermissionsRepository.find({
+        where: { role_id: userSpace.role_id },
         relations: ['permission'],
       });
 
-      const permissionNames = permissions.map((p) => p.permission.name);
-
-      // Determine topic_access_levels
-      const topicAccessLevels = [];
-
-      if (publicAccessLevel) {
-        topicAccessLevels.push({
-          id: publicAccessLevel.id,
-          name: publicAccessLevel.name,
-        });
-      }
-
-      if (privateAccessLevel && permissionNames.includes('create_private')) {
-        topicAccessLevels.push({
-          id: privateAccessLevel.id,
-          name: privateAccessLevel.name,
-        });
-      }
+      const permissionNames = rolePermissions.map((rp) =>
+        rp.permission.name.toUpperCase(),
+      );
 
       result.push({
         id: userSpace.space.id,
         name: userSpace.space.name,
         role: userSpace.role.name,
         permissions: permissionNames,
-        topic_access_levels: topicAccessLevels,
       });
     }
 
     return result;
   }
 
-  private async hasSpacePermission(
-    userId: number,
+  async setUserRole(
+    currentUserId: number,
+    targetUserId: number,
     spaceId: number,
-    permissionName: string,
-  ): Promise<boolean> {
-    const permission = await this.spacePermissionsRepository.findOne({
-      where: { name: permissionName },
-    });
-    if (!permission) {
-      return false;
+    roleId: number,
+  ): Promise<any> {
+    // Check if current user has 'CHANGE_USER_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      currentUserId,
+      spaceId,
+      'CHANGE_USER_ROLES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You cannot change user roles in this space',
+      );
     }
 
-    const userPermission = await this.userSpacePermissionsRepository.findOne({
-      where: {
-        user_id: userId,
-        space_id: spaceId,
-        permission_id: permission.id,
-      },
+    // Fetch the role to assign
+    const roleToAssign = await this.userRolesRepository.findOne({
+      where: { id: roleId, space_id: spaceId },
     });
 
-    return !!userPermission;
+    if (!roleToAssign) {
+      throw new NotFoundException('Role not found');
+    }
+
+    // Restrictions: No one can assign the owner role
+    if (roleToAssign.name === 'owner') {
+      throw new ForbiddenException('You cannot assign the owner role');
+    }
+
+    // Only owner can assign moderator role
+    if (roleToAssign.name === 'moderator') {
+      // Check if current user is owner
+      const currentUserRole = await this.getUserSpaceRole(
+        currentUserId,
+        spaceId,
+      );
+
+      if (!currentUserRole || currentUserRole.name !== 'owner') {
+        throw new ForbiddenException(
+          'Only owner can assign the moderator role',
+        );
+      }
+    }
+
+    // Check if target user exists
+    const targetUser = await this.usersRepository.findOne({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Assign or update the user's role in the space
+    let userSpaceRole = await this.userSpaceRolesRepository.findOne({
+      where: { user_id: targetUserId, space_id: spaceId },
+    });
+
+    if (!userSpaceRole) {
+      // Create new role assignment
+      userSpaceRole = this.userSpaceRolesRepository.create({
+        user_id: targetUserId,
+        space_id: spaceId,
+        role_id: roleToAssign.id,
+      });
+      await this.userSpaceRolesRepository.save(userSpaceRole);
+    } else {
+      // Update existing role assignment
+      userSpaceRole.role_id = roleToAssign.id;
+      await this.userSpaceRolesRepository.save(userSpaceRole);
+    }
+
+    return { message: 'User role updated successfully' };
   }
 }

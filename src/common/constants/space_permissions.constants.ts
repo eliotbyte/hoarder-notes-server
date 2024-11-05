@@ -1,0 +1,15 @@
+export const SPACE_PERMISSIONS_IDS: { [key: string]: number } = {
+  CHANGE_USER_ROLES: null,
+  CREATE_ROLES: null,
+  DELETE_ROLES: null,
+  EDIT_ROLES: null,
+  CREATE_NOTES: null,
+  EDIT_NOTES: null,
+  DELETE_NOTES: null,
+  READ_NOTES: null,
+  CREATE_TOPICS: null,
+  EDIT_TOPICS: null,
+  DELETE_TOPICS: null,
+  EDIT_SPACES: null,
+  DELETE_SPACES: null,
+};

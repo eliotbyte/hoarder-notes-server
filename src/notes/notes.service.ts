@@ -1,9 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Note } from '../entities/note.entity';
 import { Repository } from 'typeorm';
 import { Tag } from '../entities/tag.entity';
 import { NoteTag } from '../entities/note_tag.entity';
+import { Topic } from '../entities/topic.entity';
+import { SpacesService } from '../spaces/spaces.service';
 
 @Injectable()
 export class NotesService {
@@ -12,44 +18,100 @@ export class NotesService {
     @InjectRepository(Tag) private tagsRepository: Repository<Tag>,
     @InjectRepository(NoteTag)
     private noteTagsRepository: Repository<NoteTag>,
+    @InjectRepository(Topic) private topicsRepository: Repository<Topic>,
+    private readonly spacesService: SpacesService,
   ) {}
 
   async createNote(userId: number, createNoteDto: any): Promise<any> {
-    const { text, tags = [], parentId = null } = createNoteDto;
+    const { text, tags = [], parentId = null, topicId } = createNoteDto;
+
+    // Fetch the topic
+    const topic = await this.topicsRepository.findOne({
+      where: { id: topicId },
+    });
+
+    if (!topic) {
+      throw new NotFoundException('Topic not found');
+    }
+
+    // Check if user has permission
+    const hasPermission = await this.spacesService.hasPermission(
+      userId,
+      topic.space_id,
+      'CREATE_NOTES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to create notes in this topic',
+      );
+    }
+
     const note = this.notesRepository.create({
       text,
       parent_id: parentId,
       user_id: userId,
+      topic_id: topicId,
     });
     const savedNote = await this.notesRepository.save(note);
 
     await this.handleTags(savedNote.id, tags);
 
-    return this.getNoteById(savedNote.id);
+    return this.getNoteById(savedNote.id, userId);
   }
 
   async deleteNote(userId: number, noteId: number): Promise<any> {
     const note = await this.notesRepository.findOne({
-      where: { id: noteId, user_id: userId },
+      where: { id: noteId },
+      relations: ['topic'],
     });
-    if (note) {
-      note.is_deleted = true;
-      await this.notesRepository.save(note);
-      return this.getNoteById(noteId);
+    if (!note) {
+      throw new NotFoundException('Note not found');
     }
-    return null;
+
+    // Check if user has permission
+    const hasPermission = await this.spacesService.hasPermission(
+      userId,
+      note.topic.space_id,
+      'DELETE_NOTES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to delete this note',
+      );
+    }
+
+    note.is_deleted = true;
+    await this.notesRepository.save(note);
+    return this.getNoteById(noteId, userId);
   }
 
   async restoreNote(userId: number, noteId: number): Promise<any> {
     const note = await this.notesRepository.findOne({
-      where: { id: noteId, user_id: userId },
+      where: { id: noteId },
+      relations: ['topic'],
     });
-    if (note) {
-      note.is_deleted = false;
-      await this.notesRepository.save(note);
-      return this.getNoteById(noteId);
+    if (!note) {
+      throw new NotFoundException('Note not found');
     }
-    return null;
+
+    // Check if user has permission
+    const hasPermission = await this.spacesService.hasPermission(
+      userId,
+      note.topic.space_id,
+      'EDIT_NOTES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to restore this note',
+      );
+    }
+
+    note.is_deleted = false;
+    await this.notesRepository.save(note);
+    return this.getNoteById(noteId, userId);
   }
 
   async updateNote(
@@ -58,27 +120,56 @@ export class NotesService {
     updateNoteDto: any,
   ): Promise<any> {
     const note = await this.notesRepository.findOne({
-      where: { id: noteId, user_id: userId },
+      where: { id: noteId },
+      relations: ['topic'],
     });
-    if (note) {
-      const { text, tags = [], parentId = null } = updateNoteDto;
-      note.text = text;
-      note.parent_id = parentId;
-      await this.notesRepository.save(note);
-
-      await this.noteTagsRepository.delete({ note_id: noteId });
-      await this.handleTags(noteId, tags);
-
-      return this.getNoteById(noteId);
+    if (!note) {
+      throw new NotFoundException('Note not found');
     }
-    return null;
+
+    // Check if user has permission
+    const hasPermission = await this.spacesService.hasPermission(
+      userId,
+      note.topic.space_id,
+      'EDIT_NOTES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to edit this note',
+      );
+    }
+
+    const { text, tags = [], parentId = null } = updateNoteDto;
+    note.text = text;
+    note.parent_id = parentId;
+    await this.notesRepository.save(note);
+
+    await this.noteTagsRepository.delete({ note_id: noteId });
+    await this.handleTags(noteId, tags);
+
+    return this.getNoteById(noteId, userId);
   }
 
-  async getNoteById(noteId: number): Promise<any> {
+  async getNoteById(noteId: number, userId: number): Promise<any> {
     const note = await this.notesRepository.findOne({
       where: { id: noteId },
+      relations: ['topic'],
     });
     if (note) {
+      // Check if user has permission
+      const hasPermission = await this.spacesService.hasPermission(
+        userId,
+        note.topic.space_id,
+        'READ_NOTES',
+      );
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          'You do not have permission to read this note',
+        );
+      }
+
       const tags = await this.noteTagsRepository.find({
         where: { note_id: noteId },
         relations: ['tag'],
@@ -110,7 +201,7 @@ export class NotesService {
     return null;
   }
 
-  async getAllNotes(filters: any): Promise<any[]> {
+  async getAllNotes(userId: number, filters: any): Promise<any[]> {
     const queryBuilder = this.notesRepository.createQueryBuilder('note');
 
     queryBuilder.where('note.is_deleted = false');
@@ -136,19 +227,31 @@ export class NotesService {
         .andWhere('tag.name IN (:...tags)', { tags: filters.tags });
     }
 
+    // Only include notes from spaces where the user has READ_NOTES permission
+    const userSpaces = await this.spacesService.getSpacesForUser(userId);
+    const spaceIdsWithReadPermission = userSpaces
+      .filter((space) => space.permissions.includes('READ_NOTES'))
+      .map((space) => space.id);
+
+    queryBuilder
+      .innerJoin('topics', 'topic', 'topic.id = note.topic_id')
+      .andWhere('topic.space_id IN (:...spaceIds)', {
+        spaceIds: spaceIdsWithReadPermission,
+      });
+
     const notes = await queryBuilder.getMany();
 
     const notesWithDetails = [];
 
     for (const note of notes) {
-      const noteDetails = await this.getNoteById(note.id);
+      const noteDetails = await this.getNoteById(note.id, userId);
       notesWithDetails.push(noteDetails);
     }
 
     return notesWithDetails;
   }
 
-  private async handleTags(noteId: number, tags: string[]) {
+  async handleTags(noteId: number, tags: string[]) {
     for (const tagName of tags) {
       let tag = await this.tagsRepository.findOne({
         where: { name: tagName },

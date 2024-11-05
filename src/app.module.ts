@@ -7,7 +7,6 @@ import { NotesModule } from './notes/notes.module';
 import { UsersModule } from './users/users.module';
 import { SpacesModule } from './spaces/spaces.module';
 import { TopicsModule } from './topics/topics.module';
-import { InitialDataModule } from './initial-data/initial-data.module';
 
 @Module({
   imports: [
@@ -29,7 +28,6 @@ import { InitialDataModule } from './initial-data/initial-data.module';
     UsersModule,
     SpacesModule,
     TopicsModule,
-    InitialDataModule,
   ],
 })
 export class AppModule {}

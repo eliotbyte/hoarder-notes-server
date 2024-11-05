@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { UserSpacePermission } from './user_space_permission.entity';
+import { RolePermission } from './role_permission.entity';
 
 @Entity('space_permissions')
 export class SpacePermission {
@@ -7,11 +7,11 @@ export class SpacePermission {
   id: number;
 
   @Column({ type: 'varchar', length: 50 })
-  name: string; // 'create', 'edit', 'create_private', 'delete'
+  name: string;
 
   @OneToMany(
-    () => UserSpacePermission,
-    (userSpacePermission) => userSpacePermission.permission,
+    () => RolePermission,
+    (rolePermission) => rolePermission.permission,
   )
-  userSpacePermissions: UserSpacePermission[];
+  rolePermissions: RolePermission[];
 }

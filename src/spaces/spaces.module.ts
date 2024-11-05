@@ -4,25 +4,24 @@ import { SpacesController } from './spaces.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Space } from '../entities/space.entity';
 import { UserSpaceRole } from '../entities/user_space_role.entity';
-import { UserSpacePermission } from '../entities/user_space_permission.entity';
 import { UserRole } from '../entities/user_role.entity';
 import { SpacePermission } from '../entities/space_permission.entity';
+import { RolePermission } from '../entities/role_permission.entity';
 import { User } from '../entities/user.entity';
-import { TopicAccessLevel } from '../entities/topic_access_level.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { SpacePermissionsLoaderService } from '../space-permissions-loader/space-permissions-loader.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Space,
       UserSpaceRole,
-      UserSpacePermission,
       UserRole,
       SpacePermission,
+      RolePermission,
       User,
-      TopicAccessLevel,
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -33,7 +32,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       }),
     }),
   ],
-  providers: [SpacesService, JwtStrategy],
+  providers: [SpacesService, JwtStrategy, SpacePermissionsLoaderService],
   controllers: [SpacesController],
+  exports: [SpacesService],
 })
 export class SpacesModule {}

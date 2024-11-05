@@ -55,62 +55,18 @@ export class SpacesController {
     return this.spacesService.getSpaceParticipants(userId, Number(spaceId));
   }
 
-  @Get(':id/permissions')
-  async getUserPermissions(
+  @Put(':id/setUserRole')
+  async setUserRole(
     @Req() req,
     @Param('id') spaceId: number,
-    @Body('user_id') userIdParam?: number,
+    @Body() body: { user_id: number; role_id: number },
   ) {
     const currentUserId = req.user.userId;
-    const targetUserId = userIdParam || currentUserId;
-    return this.spacesService.getUserPermissions(
-      currentUserId,
-      targetUserId,
-      Number(spaceId),
-    );
-  }
-
-  @Put(':id/permissions')
-  async editUserPermissions(
-    @Req() req,
-    @Param('id') spaceId: number,
-    @Body() body: { user_id: number; permissions: string[] },
-  ) {
-    const currentUserId = req.user.userId;
-    return this.spacesService.editUserPermissions(
+    return this.spacesService.setUserRole(
       currentUserId,
       body.user_id,
       Number(spaceId),
-      body.permissions,
-    );
-  }
-
-  @Put(':id/roles')
-  async editUserRole(
-    @Req() req,
-    @Param('id') spaceId: number,
-    @Body() body: { user_id: number; role: string },
-  ) {
-    const currentUserId = req.user.userId;
-    return this.spacesService.editUserRole(
-      currentUserId,
-      body.user_id,
-      Number(spaceId),
-      body.role,
-    );
-  }
-
-  @Post(':id/participants')
-  async addParticipant(
-    @Req() req,
-    @Param('id') spaceId: number,
-    @Body() body: { user_id: number },
-  ) {
-    const currentUserId = req.user.userId;
-    return this.spacesService.addParticipant(
-      currentUserId,
-      body.user_id,
-      Number(spaceId),
+      body.role_id,
     );
   }
 

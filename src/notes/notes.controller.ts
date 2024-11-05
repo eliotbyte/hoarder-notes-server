@@ -51,19 +51,21 @@ export class NotesController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getNoteById(@Param('id') noteId: number) {
-    return this.notesService.getNoteById(Number(noteId));
+  async getNoteById(@Req() req, @Param('id') noteId: number) {
+    const userId = req.user.userId;
+    return this.notesService.getNoteById(Number(noteId), userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async getAllNotes(@Query() query: any) {
+  async getAllNotes(@Req() req, @Query() query: any) {
+    const userId = req.user.userId;
     const filters = {
       date: query.date,
       parentId: query.parentId ? Number(query.parentId) : undefined,
       notReply: query.notReply === 'true',
       tags: query.tags ? query.tags.split(',') : [],
     };
-    return this.notesService.getAllNotes(filters);
+    return this.notesService.getAllNotes(userId, filters);
   }
 }

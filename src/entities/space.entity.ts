@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { Topic } from './topic.entity';
 import { UserSpaceRole } from './user_space_role.entity';
-import { UserSpacePermission } from './user_space_permission.entity';
+import { UserRole } from './user_role.entity';
 
 @Entity('spaces')
 export class Space {
@@ -33,9 +33,6 @@ export class Space {
   @OneToMany(() => UserSpaceRole, (userSpaceRole) => userSpaceRole.space)
   userSpaceRoles: UserSpaceRole[];
 
-  @OneToMany(
-    () => UserSpacePermission,
-    (userSpacePermission) => userSpacePermission.space,
-  )
-  userSpacePermissions: UserSpacePermission[];
+  @OneToMany(() => UserRole, (userRole) => userRole.space)
+  userRoles: UserRole[];
 }
