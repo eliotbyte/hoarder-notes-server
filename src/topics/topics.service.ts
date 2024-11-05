@@ -35,6 +35,7 @@ export class TopicsService {
     // Check if the user has permission to create topics in this space
     const userRole = await this.userSpaceRolesRepository.findOne({
       where: { user_id: userId, space_id },
+      relations: ['role'],
     });
 
     if (!userRole || !['owner', 'moderator'].includes(userRole.role.name)) {
