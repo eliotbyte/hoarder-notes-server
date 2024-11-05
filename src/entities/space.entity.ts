@@ -6,12 +6,12 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
+import { Topic } from './topic.entity';
 import { UserSpaceRole } from './user_space_role.entity';
 import { UserSpacePermission } from './user_space_permission.entity';
-import { UserTopicPermission } from './user_topic_permission.entity';
 
-@Entity('users')
-export class User {
+@Entity('spaces')
+export class Space {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -21,24 +21,21 @@ export class User {
   @UpdateDateColumn({ type: 'timestamp' })
   modified_at: Date;
 
-  @Column({ type: 'varchar', length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  password_hash: string;
+  @Column({ default: false })
+  is_deleted: boolean;
 
-  @OneToMany(() => UserSpaceRole, (userSpaceRole) => userSpaceRole.user)
+  @OneToMany(() => Topic, (topic) => topic.space)
+  topics: Topic[];
+
+  @OneToMany(() => UserSpaceRole, (userSpaceRole) => userSpaceRole.space)
   userSpaceRoles: UserSpaceRole[];
 
   @OneToMany(
     () => UserSpacePermission,
-    (userSpacePermission) => userSpacePermission.user,
+    (userSpacePermission) => userSpacePermission.space,
   )
   userSpacePermissions: UserSpacePermission[];
-
-  @OneToMany(
-    () => UserTopicPermission,
-    (userTopicPermission) => userTopicPermission.user,
-  )
-  userTopicPermissions: UserTopicPermission[];
 }

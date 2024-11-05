@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
 import { NotesModule } from './notes/notes.module';
-import { User } from './entities/user.entity';
-import { Note } from './entities/note.entity';
-import { Tag } from './entities/tag.entity';
-import { NoteTag } from './entities/note_tag.entity';
+import { UsersModule } from './users/users.module';
+import { SpacesModule } from './spaces/spaces.module';
+import { TopicsModule } from './topics/topics.module';
+import { InitialDataModule } from './initial-data/initial-data.module';
 
 @Module({
   imports: [
@@ -20,11 +21,15 @@ import { NoteTag } from './entities/note_tag.entity';
       username: 'postgres',
       password: 'postgres',
       database: 'hoarder_notes_db',
-      entities: [User, Note, Tag, NoteTag],
+      entities: [join(__dirname, '**', '*.entity.{ts,js}')],
       synchronize: true,
     }),
     AuthModule,
     NotesModule,
+    UsersModule,
+    SpacesModule,
+    TopicsModule,
+    InitialDataModule,
   ],
 })
 export class AppModule {}
