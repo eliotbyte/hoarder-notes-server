@@ -5,14 +5,15 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
 import { Space } from '../entities/space.entity';
-import { Repository } from 'typeorm';
 import { UserSpaceRole } from '../entities/user_space_role.entity';
 import { UserRole } from '../entities/user_role.entity';
 import { SpacePermission } from '../entities/space_permission.entity';
 import { RolePermission } from '../entities/role_permission.entity';
 import { User } from '../entities/user.entity';
 import { Topic } from '../entities/topic.entity';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
 import { SPACE_PERMISSIONS_IDS } from '../common/constants/space_permissions.constants';
 
 @Injectable()
@@ -20,18 +21,27 @@ export class SpacesService {
   constructor(
     @InjectRepository(Space)
     private readonly spacesRepository: Repository<Space>,
+
     @InjectRepository(UserSpaceRole)
     private readonly userSpaceRolesRepository: Repository<UserSpaceRole>,
+
     @InjectRepository(UserRole)
     private readonly userRolesRepository: Repository<UserRole>,
+
     @InjectRepository(SpacePermission)
     private readonly spacePermissionsRepository: Repository<SpacePermission>,
+
     @InjectRepository(RolePermission)
     private readonly rolePermissionsRepository: Repository<RolePermission>,
+
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+
     @InjectRepository(Topic)
     private readonly topicsRepository: Repository<Topic>,
+
+    @InjectRepository(TopicUserRole)
+    private readonly topicUserRolesRepository: Repository<TopicUserRole>,
   ) {}
 
   async hasPermission(
@@ -80,6 +90,18 @@ export class SpacesService {
     }
   }
 
+  async getUserRolesInSpace(
+    userId: number,
+    spaceId: number,
+  ): Promise<UserRole[]> {
+    const userSpaceRoles = await this.userSpaceRolesRepository.find({
+      where: { user_id: userId, space_id: spaceId },
+      relations: ['role'],
+    });
+
+    return userSpaceRoles.map((usr) => usr.role);
+  }
+
   async getSpacesForUser(userId: number): Promise<any[]> {
     // Fetch the spaces where the user has a role
     const userSpaces = await this.userSpaceRolesRepository.find({
@@ -90,6 +112,12 @@ export class SpacesService {
     const result = [];
 
     for (const userSpace of userSpaces) {
+      const space = userSpace.space;
+
+      if (space.is_deleted) {
+        continue; // Skip deleted spaces
+      }
+
       // Get permissions assigned to the role
       const rolePermissions = await this.rolePermissionsRepository.find({
         where: { role_id: userSpace.role_id },
@@ -100,16 +128,26 @@ export class SpacesService {
         rp.permission.name.toLowerCase(),
       );
 
-      // Fetch topics in the space
-      const topics = await this.topicsRepository.find({
-        where: { space_id: userSpace.space.id, is_deleted: false },
-        select: ['id', 'name'],
+      // Fetch topics associated with the user's roles in this space
+      const userRoles = await this.getUserRolesInSpace(userId, space.id);
+      const roleIds = userRoles.map((role) => role.id);
+
+      const topicUserRoles = await this.topicUserRolesRepository.find({
+        where: { role_id: In(roleIds) },
+        relations: ['topic'],
       });
 
+      const topics = topicUserRoles
+        .filter((tur) => !tur.topic.is_deleted)
+        .map((tur) => ({
+          id: tur.topic.id,
+          name: tur.topic.name,
+        }));
+
       result.push({
-        id: userSpace.space.id,
-        name: userSpace.space.name,
-        roles: [userSpace.role.name],
+        id: space.id,
+        name: space.name,
+        roles: userRoles.map((role) => role.name),
         permissions: permissionNames,
         topics: topics,
       });
@@ -120,27 +158,25 @@ export class SpacesService {
 
   async getSpaceById(userId: number, spaceId: number): Promise<any> {
     // Check if user is part of the space
-    const userRole = await this.userSpaceRolesRepository.findOne({
-      where: { user_id: userId, space_id: spaceId },
-      relations: ['role'],
-    });
+    const userRoles = await this.getUserRolesInSpace(userId, spaceId);
 
-    if (!userRole) {
+    if (userRoles.length === 0) {
       throw new ForbiddenException('You are not a participant of this space');
     }
 
-    // Fetch the space
     const space = await this.spacesRepository.findOne({
-      where: { id: spaceId },
+      where: { id: spaceId, is_deleted: false },
     });
 
     if (!space) {
       throw new NotFoundException('Space not found');
     }
 
-    // Get permissions assigned to the user's role
+    // Get permissions assigned to the user's roles
+    const roleIds = userRoles.map((role) => role.id);
+
     const rolePermissions = await this.rolePermissionsRepository.find({
-      where: { role_id: userRole.role_id },
+      where: { role_id: In(roleIds) },
       relations: ['permission'],
     });
 
@@ -148,16 +184,23 @@ export class SpacesService {
       rp.permission.name.toLowerCase(),
     );
 
-    // Fetch topics in the space
-    const topics = await this.topicsRepository.find({
-      where: { space_id: space.id, is_deleted: false },
-      select: ['id', 'name'],
+    // Fetch topics associated with the user's roles in this space
+    const topicUserRoles = await this.topicUserRolesRepository.find({
+      where: { role_id: In(roleIds) },
+      relations: ['topic'],
     });
+
+    const topics = topicUserRoles
+      .filter((tur) => !tur.topic.is_deleted)
+      .map((tur) => ({
+        id: tur.topic.id,
+        name: tur.topic.name,
+      }));
 
     return {
       id: space.id,
       name: space.name,
-      roles: [userRole.role.name],
+      roles: userRoles.map((role) => role.name),
       permissions: permissionNames,
       topics: topics,
     };
@@ -646,5 +689,217 @@ export class SpacesService {
     await this.userSpaceRolesRepository.delete({ id: targetUserRole.id });
 
     return { message: 'Participant removed successfully' };
+  }
+
+  async getRolesInSpace(userId: number, spaceId: number): Promise<any> {
+    // Check if user is part of the space
+    const userRole = await this.userSpaceRolesRepository.findOne({
+      where: { user_id: userId, space_id: spaceId },
+      relations: ['role'],
+    });
+
+    if (!userRole) {
+      throw new ForbiddenException('You are not a participant of this space');
+    }
+
+    // Fetch all roles in the space
+    const roles = await this.userRolesRepository.find({
+      where: { space_id: spaceId, is_deleted: false },
+      relations: ['topicUserRoles', 'topicUserRoles.topic'],
+    });
+
+    const result = roles.map((role) => {
+      const topics = role.topicUserRoles.map((tur) => ({
+        id: tur.topic.id,
+        name: tur.topic.name,
+      }));
+
+      return {
+        id: role.id,
+        name: role.name,
+        is_custom: role.is_custom,
+        is_default: role.is_default,
+        topics: topics,
+      };
+    });
+
+    return result;
+  }
+
+  async createRole(
+    userId: number,
+    spaceId: number,
+    createRoleDto: any,
+  ): Promise<any> {
+    // Check if user has 'CREATE_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      userId,
+      spaceId,
+      'CREATE_ROLES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to create roles in this space',
+      );
+    }
+
+    const { name, permissions } = createRoleDto;
+
+    // Create new role
+    const role = this.userRolesRepository.create({
+      name,
+      is_custom: true,
+      is_default: false,
+      space_id: spaceId,
+      is_deleted: false,
+    });
+
+    const savedRole = await this.userRolesRepository.save(role);
+
+    // Assign permissions to role
+    const rolePermissions = permissions.map((permName) => {
+      const permissionId = SPACE_PERMISSIONS_IDS[permName];
+      if (!permissionId) {
+        throw new NotFoundException(`Permission ${permName} not found`);
+      }
+      return this.rolePermissionsRepository.create({
+        role_id: savedRole.id,
+        permission_id: permissionId,
+      });
+    });
+
+    await this.rolePermissionsRepository.save(rolePermissions);
+
+    return savedRole;
+  }
+
+  async editRole(
+    userId: number,
+    spaceId: number,
+    roleId: number,
+    updateRoleDto: any,
+  ): Promise<any> {
+    // Check if user has 'EDIT_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      userId,
+      spaceId,
+      'EDIT_ROLES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to edit roles in this space',
+      );
+    }
+
+    // Fetch the role to edit
+    const role = await this.userRolesRepository.findOne({
+      where: { id: roleId, space_id: spaceId },
+    });
+
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+
+    if (!role.is_custom) {
+      throw new ForbiddenException('You can only edit custom roles');
+    }
+
+    // Update role properties
+    role.name = updateRoleDto.name ?? role.name;
+
+    await this.userRolesRepository.save(role);
+
+    // Update role permissions
+    if (updateRoleDto.permissions) {
+      // Delete existing permissions
+      await this.rolePermissionsRepository.delete({ role_id: role.id });
+
+      // Assign new permissions
+      const rolePermissions = updateRoleDto.permissions.map((permName) => {
+        const permissionId = SPACE_PERMISSIONS_IDS[permName];
+        if (!permissionId) {
+          throw new NotFoundException(`Permission ${permName} not found`);
+        }
+        return this.rolePermissionsRepository.create({
+          role_id: role.id,
+          permission_id: permissionId,
+        });
+      });
+
+      await this.rolePermissionsRepository.save(rolePermissions);
+    }
+
+    return role;
+  }
+
+  async editRoleTopics(
+    userId: number,
+    spaceId: number,
+    roleId: number,
+    topicIds: number[],
+  ): Promise<any> {
+    // Check if user has 'EDIT_ROLES' permission
+    const hasPermission = await this.hasPermission(
+      userId,
+      spaceId,
+      'EDIT_ROLES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to edit roles in this space',
+      );
+    }
+
+    // Check if the role exists and belongs to the space
+    const role = await this.userRolesRepository.findOne({
+      where: { id: roleId, space_id: spaceId },
+    });
+
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+
+    // Check if the user has this role
+    const userRoles = await this.getUserRolesInSpace(userId, spaceId);
+    const userRoleIds = userRoles.map((ur) => ur.id);
+
+    if (!userRoleIds.includes(roleId)) {
+      throw new ForbiddenException('You cannot edit topics for this role');
+    }
+
+    // Verify that all topicIds are in the space
+    const topics = await this.topicsRepository.findByIds(topicIds);
+    const invalidTopics = topics.filter((topic) => topic.space_id !== spaceId);
+    if (invalidTopics.length > 0) {
+      throw new ForbiddenException(
+        'Some topics are not in the specified space',
+      );
+    }
+
+    // Delete existing TopicUserRole associations for this role
+    await this.topicUserRolesRepository.delete({ role_id: roleId });
+
+    // Create new associations
+    const topicUserRoles = topicIds.map((topicId) => {
+      return this.topicUserRolesRepository.create({
+        role_id: roleId,
+        topic_id: topicId,
+      });
+    });
+
+    await this.topicUserRolesRepository.save(topicUserRoles);
+
+    // Return the role_id and full list of topic_ids linked to role_id
+    const updatedTopicUserRoles = await this.topicUserRolesRepository.find({
+      where: { role_id: roleId },
+    });
+
+    return {
+      role_id: roleId,
+      topic_ids: updatedTopicUserRoles.map((tur) => tur.topic_id),
+    };
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Space } from './space.entity';
 import { Note } from './note.entity';
+import { TopicUserRole } from './topic_user_role.entity';
 
 @Entity('topics')
 export class Topic {
@@ -37,4 +38,7 @@ export class Topic {
 
   @OneToMany(() => Note, (note) => note.topic)
   notes: Note[];
+
+  @OneToMany(() => TopicUserRole, (topicUserRole) => topicUserRole.topic)
+  topicUserRoles: TopicUserRole[];
 }

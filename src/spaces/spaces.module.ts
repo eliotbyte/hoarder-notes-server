@@ -9,6 +9,7 @@ import { SpacePermission } from '../entities/space_permission.entity';
 import { RolePermission } from '../entities/role_permission.entity';
 import { User } from '../entities/user.entity';
 import { Topic } from '../entities/topic.entity';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -24,6 +25,7 @@ import { SpacePermissionsLoaderService } from '../space-permissions-loader/space
       RolePermission,
       User,
       Topic,
+      TopicUserRole,
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

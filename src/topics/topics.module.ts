@@ -3,7 +3,8 @@ import { TopicsService } from './topics.service';
 import { TopicsController } from './topics.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Topic } from '../entities/topic.entity';
-import { SpacesService } from '../spaces/spaces.service';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
+import { UserRole } from '../entities/user_role.entity';
 import { SpacesModule } from '../spaces/spaces.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '../auth/jwt.strategy';
@@ -11,7 +12,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Topic]),
+    TypeOrmModule.forFeature([Topic, TopicUserRole, UserRole]),
     SpacesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

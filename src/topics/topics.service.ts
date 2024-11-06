@@ -7,12 +7,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Topic } from '../entities/topic.entity';
 import { SpacesService } from '../spaces/spaces.service';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
+import { UserRole } from '../entities/user_role.entity';
 
 @Injectable()
 export class TopicsService {
   constructor(
     @InjectRepository(Topic)
     private readonly topicsRepository: Repository<Topic>,
+    @InjectRepository(UserRole)
+    private readonly userRolesRepository: Repository<UserRole>,
+    @InjectRepository(TopicUserRole)
+    private readonly topicUserRolesRepository: Repository<TopicUserRole>,
     private readonly spacesService: SpacesService,
   ) {}
 
@@ -39,7 +45,24 @@ export class TopicsService {
       is_deleted: false,
     });
 
-    return await this.topicsRepository.save(topic);
+    const savedTopic = await this.topicsRepository.save(topic);
+
+    // Get the 'owner' role in the space
+    const ownerRole = await this.userRolesRepository.findOne({
+      where: { name: 'owner', space_id },
+    });
+
+    if (ownerRole) {
+      // Create the TopicUserRole association
+      const topicUserRole = this.topicUserRolesRepository.create({
+        topic_id: savedTopic.id,
+        role_id: ownerRole.id,
+      });
+
+      await this.topicUserRolesRepository.save(topicUserRole);
+    }
+
+    return savedTopic;
   }
 
   async editTopic(

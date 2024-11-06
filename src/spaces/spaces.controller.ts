@@ -101,4 +101,56 @@ export class SpacesController {
     const userId = req.user.userId;
     return this.spacesService.getSpacePermissions(userId, Number(spaceId));
   }
+
+  @Get(':id/roles')
+  async getRolesInSpace(@Req() req, @Param('id') spaceId: number) {
+    const userId = req.user.userId;
+    return this.spacesService.getRolesInSpace(userId, Number(spaceId));
+  }
+
+  @Post(':id/roles')
+  async createRole(
+    @Req() req,
+    @Param('id') spaceId: number,
+    @Body() createRoleDto: any,
+  ) {
+    const userId = req.user.userId;
+    return this.spacesService.createRole(
+      userId,
+      Number(spaceId),
+      createRoleDto,
+    );
+  }
+
+  @Put(':spaceId/roles/:roleId')
+  async editRole(
+    @Req() req,
+    @Param('spaceId') spaceId: number,
+    @Param('roleId') roleId: number,
+    @Body() updateRoleDto: any,
+  ) {
+    const userId = req.user.userId;
+    return this.spacesService.editRole(
+      userId,
+      Number(spaceId),
+      Number(roleId),
+      updateRoleDto,
+    );
+  }
+
+  @Put(':spaceId/roles/:roleId/topics')
+  async editRoleTopics(
+    @Req() req,
+    @Param('spaceId') spaceId: number,
+    @Param('roleId') roleId: number,
+    @Body() body: { topic_ids: number[] },
+  ) {
+    const userId = req.user.userId;
+    return this.spacesService.editRoleTopics(
+      userId,
+      Number(spaceId),
+      Number(roleId),
+      body.topic_ids,
+    );
+  }
 }
