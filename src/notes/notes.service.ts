@@ -69,17 +69,19 @@ export class NotesService {
       throw new NotFoundException('Note not found');
     }
 
-    // Check if user has permission
-    const hasPermission = await this.spacesService.hasPermission(
-      userId,
-      note.topic.space_id,
-      'DELETE_NOTES',
-    );
-
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to delete this note',
+    if (note.user_id !== userId) {
+      // Check if user has DELETE_NOTES permission
+      const hasPermission = await this.spacesService.hasPermission(
+        userId,
+        note.topic.space_id,
+        'DELETE_NOTES',
       );
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          'You do not have permission to delete this note',
+        );
+      }
     }
 
     note.is_deleted = true;
@@ -127,17 +129,19 @@ export class NotesService {
       throw new NotFoundException('Note not found');
     }
 
-    // Check if user has permission
-    const hasPermission = await this.spacesService.hasPermission(
-      userId,
-      note.topic.space_id,
-      'EDIT_NOTES',
-    );
-
-    if (!hasPermission) {
-      throw new ForbiddenException(
-        'You do not have permission to edit this note',
+    if (note.user_id !== userId) {
+      // Check if user has EDIT_NOTES permission
+      const hasPermission = await this.spacesService.hasPermission(
+        userId,
+        note.topic.space_id,
+        'EDIT_NOTES',
       );
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          'You do not have permission to edit this note',
+        );
+      }
     }
 
     const { text, tags = [], parentId = null } = updateNoteDto;

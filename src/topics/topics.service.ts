@@ -101,23 +101,4 @@ export class TopicsService {
 
     return await this.topicsRepository.save(topic);
   }
-
-  async getTopicsBySpace(userId: number, spaceId: number): Promise<any[]> {
-    // Check if user is part of the space
-    const userRole = await this.spacesService.getUserSpaceRole(userId, spaceId);
-
-    if (!userRole) {
-      throw new ForbiddenException('You are not a participant of this space');
-    }
-
-    // Fetch all topics in the space
-    const topics = await this.topicsRepository.find({
-      where: { space_id: spaceId, is_deleted: false },
-    });
-
-    return topics.map((topic) => ({
-      id: topic.id,
-      name: topic.name,
-    }));
-  }
 }

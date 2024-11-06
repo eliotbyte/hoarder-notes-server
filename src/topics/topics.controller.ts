@@ -3,7 +3,6 @@ import {
   Post,
   Put,
   Delete,
-  Get,
   Param,
   Body,
   Req,
@@ -44,11 +43,5 @@ export class TopicsController {
   async deleteTopic(@Req() req, @Param('id') topicId: number) {
     const userId = req.user.userId;
     return this.topicsService.deleteTopic(userId, Number(topicId));
-  }
-
-  @Get('space/:spaceId')
-  async getTopicsBySpace(@Req() req, @Param('spaceId') spaceId: number) {
-    const userId = req.user.userId;
-    return this.topicsService.getTopicsBySpace(userId, Number(spaceId));
   }
 }

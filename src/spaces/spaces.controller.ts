@@ -70,9 +70,35 @@ export class SpacesController {
     );
   }
 
+  @Delete(':id/removeUserRole')
+  async removeUserRole(
+    @Req() req,
+    @Param('id') spaceId: number,
+    @Body() body: { user_id: number },
+  ) {
+    const currentUserId = req.user.userId;
+    return this.spacesService.removeUserRole(
+      currentUserId,
+      body.user_id,
+      Number(spaceId),
+    );
+  }
+
   @Get()
   async getSpaces(@Req() req) {
     const userId = req.user.userId;
     return this.spacesService.getSpacesForUser(userId);
+  }
+
+  @Get(':id')
+  async getSpace(@Req() req, @Param('id') spaceId: number) {
+    const userId = req.user.userId;
+    return this.spacesService.getSpaceById(userId, Number(spaceId));
+  }
+
+  @Get(':id/permissions')
+  async getSpacePermissions(@Req() req, @Param('id') spaceId: number) {
+    const userId = req.user.userId;
+    return this.spacesService.getSpacePermissions(userId, Number(spaceId));
   }
 }
