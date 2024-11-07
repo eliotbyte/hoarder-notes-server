@@ -5,11 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Note } from '../entities/note.entity';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Tag } from '../entities/tag.entity';
 import { NoteTag } from '../entities/note_tag.entity';
 import { Topic } from '../entities/topic.entity';
 import { SpacesService } from '../spaces/spaces.service';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
+import { UserSpaceRole } from '../entities/user_space_role.entity';
 
 @Injectable()
 export class NotesService {
@@ -19,6 +21,10 @@ export class NotesService {
     @InjectRepository(NoteTag)
     private noteTagsRepository: Repository<NoteTag>,
     @InjectRepository(Topic) private topicsRepository: Repository<Topic>,
+    @InjectRepository(TopicUserRole)
+    private topicUserRolesRepository: Repository<TopicUserRole>,
+    @InjectRepository(UserSpaceRole)
+    private userSpaceRolesRepository: Repository<UserSpaceRole>,
     private readonly spacesService: SpacesService,
   ) {}
 
@@ -231,17 +237,102 @@ export class NotesService {
         .andWhere('tag.name IN (:...tags)', { tags: filters.tags });
     }
 
-    // Only include notes from spaces where the user has READ_NOTES permission
-    const userSpaces = await this.spacesService.getSpacesForUser(userId);
-    const spaceIdsWithReadPermission = userSpaces
-      .filter((space) => space.permissions.includes('READ_NOTES'))
-      .map((space) => space.id);
+    if (filters.spaceId) {
+      // Check if the user has 'READ_NOTES' permission in the specified space
+      const hasPermission = await this.spacesService.hasPermission(
+        userId,
+        filters.spaceId,
+        'READ_NOTES',
+      );
 
-    queryBuilder
-      .innerJoin('topics', 'topic', 'topic.id = note.topic_id')
-      .andWhere('topic.space_id IN (:...spaceIds)', {
-        spaceIds: spaceIdsWithReadPermission,
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          'You do not have permission to read notes in this space',
+        );
+      }
+
+      // Get the user's roles in the space
+      const userRoles = await this.spacesService.getUserRolesInSpace(
+        userId,
+        filters.spaceId,
+      );
+      const roleIds = userRoles.map((role) => role.id);
+
+      // Get topics the user has access to via topic_user_roles
+      const topicUserRoles = await this.topicUserRolesRepository.find({
+        where: { role_id: In(roleIds) },
       });
+      let accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
+
+      if (filters.topicId) {
+        // Check if the topic is in the space and if the user has access to it
+        const topic = await this.topicsRepository.findOne({
+          where: { id: filters.topicId, space_id: filters.spaceId },
+        });
+        if (!topic) {
+          throw new NotFoundException('Topic not found in the specified space');
+        }
+
+        if (!accessibleTopicIds.includes(filters.topicId)) {
+          throw new ForbiddenException('You do not have access to this topic');
+        }
+
+        queryBuilder.andWhere('note.topic_id = :topicId', {
+          topicId: filters.topicId,
+        });
+      } else {
+        // Filter notes by accessible topic IDs
+        if (accessibleTopicIds.length > 0) {
+          queryBuilder.andWhere('note.topic_id IN (:...topicIds)', {
+            topicIds: accessibleTopicIds,
+          });
+        } else {
+          // No accessible topics, return empty result
+          return [];
+        }
+      }
+    } else {
+      // No spaceId specified
+      // Get the list of spaceIds where the user has 'READ_NOTES' permission
+      const userSpaces = await this.spacesService.getSpacesForUser(userId);
+      const spaceIdsWithReadPermission = userSpaces
+        .filter((space) => space.permissions.includes('read_notes'))
+        .map((space) => space.id);
+
+      if (spaceIdsWithReadPermission.length === 0) {
+        return [];
+      }
+
+      // Get the user's roles in these spaces
+      const userRolesInSpaces = await this.userSpaceRolesRepository.find({
+        where: { user_id: userId, space_id: In(spaceIdsWithReadPermission) },
+        relations: ['role'],
+      });
+      const roleIds = userRolesInSpaces.map((usr) => usr.role.id);
+
+      // Get topics that the user has access to via topic_user_roles
+      const topicUserRoles = await this.topicUserRolesRepository.find({
+        where: { role_id: In(roleIds) },
+      });
+      const accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
+
+      if (accessibleTopicIds.length === 0) {
+        return [];
+      }
+
+      if (filters.topicId) {
+        if (!accessibleTopicIds.includes(filters.topicId)) {
+          throw new ForbiddenException('You do not have access to this topic');
+        }
+        queryBuilder.andWhere('note.topic_id = :topicId', {
+          topicId: filters.topicId,
+        });
+      } else {
+        queryBuilder.andWhere('note.topic_id IN (:...topicIds)', {
+          topicIds: accessibleTopicIds,
+        });
+      }
+    }
 
     const notes = await queryBuilder.getMany();
 

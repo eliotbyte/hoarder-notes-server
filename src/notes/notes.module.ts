@@ -6,15 +6,23 @@ import { Note } from '../entities/note.entity';
 import { NoteTag } from '../entities/note_tag.entity';
 import { Tag } from '../entities/tag.entity';
 import { Topic } from '../entities/topic.entity';
+import { TopicUserRole } from '../entities/topic_user_role.entity';
+import { UserSpaceRole } from '../entities/user_space_role.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { SpacesService } from '../spaces/spaces.service';
 import { SpacesModule } from '../spaces/spaces.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Note, NoteTag, Tag, Topic]),
+    TypeOrmModule.forFeature([
+      Note,
+      NoteTag,
+      Tag,
+      Topic,
+      TopicUserRole,
+      UserSpaceRole,
+    ]),
     SpacesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

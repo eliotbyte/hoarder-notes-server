@@ -65,6 +65,8 @@ export class NotesController {
       parentId: query.parentId ? Number(query.parentId) : undefined,
       notReply: query.notReply === 'true',
       tags: query.tags ? query.tags.split(',') : [],
+      spaceId: query.space_id ? Number(query.space_id) : undefined,
+      topicId: query.topic_id ? Number(query.topic_id) : undefined,
     };
     return this.notesService.getAllNotes(userId, filters);
   }
