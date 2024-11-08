@@ -29,11 +29,11 @@ export class NotesService {
   ) {}
 
   async createNote(userId: number, createNoteDto: any): Promise<any> {
-    const { text, tags = [], parent_id = null, topic_id } = createNoteDto;
+    const { text, tags = [], parentId = null, topicId } = createNoteDto;
 
     // Fetch the topic
     const topic = await this.topicsRepository.findOne({
-      where: { id: topic_id },
+      where: { id: topicId },
     });
 
     if (!topic) {
@@ -55,9 +55,9 @@ export class NotesService {
 
     const note = this.notesRepository.create({
       text,
-      parent_id: parent_id,
+      parent_id: parentId,
       user_id: userId,
-      topic_id: topic_id,
+      topic_id: topicId,
     });
     const savedNote = await this.notesRepository.save(note);
 
@@ -150,9 +150,9 @@ export class NotesService {
       }
     }
 
-    const { text, tags = [], parent_id = null } = updateNoteDto;
+    const { text, tags = [], parentId = null } = updateNoteDto;
     note.text = text;
-    note.parent_id = parent_id;
+    note.parent_id = parentId;
     await this.notesRepository.save(note);
 
     await this.noteTagsRepository.delete({ note_id: noteId });
@@ -197,14 +197,14 @@ export class NotesService {
       return {
         id: note.id,
         text: note.text,
-        parent_id: note.parent_id,
-        user_id: note.user_id,
-        created_at: note.created_at,
-        modified_at: note.modified_at,
-        parent_text_preview: parentNote
+        parentId: note.parent_id,
+        userId: note.user_id,
+        createdAt: note.created_at,
+        modifiedAt: note.modified_at,
+        parentTextPreview: parentNote
           ? parentNote.text.substring(0, 100)
           : null,
-        reply_count: replyCount,
+        replyCount,
         tags: tagNames,
       };
     }
@@ -220,13 +220,13 @@ export class NotesService {
       queryBuilder.andWhere('note.created_at < :date', { date: filters.date });
     }
 
-    if (filters.parent_id !== undefined) {
+    if (filters.parentId !== undefined) {
       queryBuilder.andWhere('note.parent_id = :parentId', {
-        parentId: filters.parent_id,
+        parentId: filters.parentId,
       });
     }
 
-    if (filters.not_reply) {
+    if (filters.notReply) {
       queryBuilder.andWhere('note.parent_id IS NULL');
     }
 
@@ -240,7 +240,7 @@ export class NotesService {
     // Check if the user has 'READ_NOTES' permission in the specified space
     const hasPermission = await this.spacesService.hasPermission(
       userId,
-      filters.space_id,
+      filters.spaceId,
       'READ_NOTES',
     );
 
@@ -253,7 +253,7 @@ export class NotesService {
     // Get the user's roles in the space
     const userRoles = await this.spacesService.getUserRolesInSpace(
       userId,
-      filters.space_id,
+      filters.spaceId,
     );
     const roleIds = userRoles.map((role) => role.id);
 
@@ -263,21 +263,21 @@ export class NotesService {
     });
     let accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
 
-    if (filters.topic_id) {
+    if (filters.topicId) {
       // Check if the topic is in the space and if the user has access to it
       const topic = await this.topicsRepository.findOne({
-        where: { id: filters.topic_id, space_id: filters.space_id },
+        where: { id: filters.topicId, space_id: filters.spaceId },
       });
       if (!topic) {
         throw new NotFoundException('Topic not found in the specified space');
       }
 
-      if (!accessibleTopicIds.includes(filters.topic_id)) {
+      if (!accessibleTopicIds.includes(filters.topicId)) {
         throw new ForbiddenException('You do not have access to this topic');
       }
 
       queryBuilder.andWhere('note.topic_id = :topicId', {
-        topicId: filters.topic_id,
+        topicId: filters.topicId,
       });
     } else {
       // Filter notes by accessible topic IDs

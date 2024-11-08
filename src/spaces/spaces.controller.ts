@@ -59,14 +59,14 @@ export class SpacesController {
   async setUserRole(
     @Req() req,
     @Param('id') spaceId: number,
-    @Body() body: { user_id: number; role_id: number },
+    @Body() body: { userId: number; roleId: number },
   ) {
     const currentUserId = req.user.userId;
     return this.spacesService.setUserRole(
       currentUserId,
-      body.user_id,
+      body.userId,
       Number(spaceId),
-      body.role_id,
+      body.roleId,
     );
   }
 
@@ -74,12 +74,12 @@ export class SpacesController {
   async removeUserRole(
     @Req() req,
     @Param('id') spaceId: number,
-    @Body() body: { user_id: number },
+    @Body() body: { userId: number },
   ) {
     const currentUserId = req.user.userId;
     return this.spacesService.removeUserRole(
       currentUserId,
-      body.user_id,
+      body.userId,
       Number(spaceId),
     );
   }

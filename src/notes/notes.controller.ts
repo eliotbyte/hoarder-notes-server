@@ -63,17 +63,17 @@ export class NotesController {
     const userId = req.user.userId;
 
     // Ensure space_id is provided
-    if (!query.space_id) {
-      throw new BadRequestException('space_id is a required parameter');
+    if (!query.spaceId) {
+      throw new BadRequestException('spaceId is a required parameter');
     }
 
     const filters = {
       date: query.date,
-      parent_id: query.parent_id ? Number(query.parent_id) : undefined,
-      not_reply: query.not_reply === 'true',
+      parentId: query.parentId ? Number(query.parentId) : undefined,
+      notReply: query.notReply === 'true',
       tags: query.tags ? query.tags.split(',') : [],
-      space_id: Number(query.space_id),
-      topic_id: query.topic_id ? Number(query.topic_id) : undefined,
+      spaceId: Number(query.spaceId),
+      topicId: query.topicId ? Number(query.topicId) : undefined,
     };
 
     return this.notesService.getAllNotes(userId, filters);

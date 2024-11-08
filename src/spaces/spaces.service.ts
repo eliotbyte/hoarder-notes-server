@@ -389,13 +389,15 @@ export class SpacesService {
         is_default: true,
         permissions: [
           'CHANGE_USER_ROLES',
+          'CREATE_ROLES',
           'CREATE_NOTES',
           'EDIT_NOTES',
           'DELETE_NOTES',
           'READ_NOTES',
           'CREATE_TOPICS',
           'EDIT_TOPICS',
-          'DELETE_TOPICS',
+          'DELETE_TOPics',
+          // Add other permissions as needed
         ],
       },
       {
@@ -405,7 +407,7 @@ export class SpacesService {
         permissions: [
           'CREATE_NOTES',
           'EDIT_NOTES',
-          'DELETE_NOTES',
+          'DELETE_NOTes',
           'READ_NOTES',
         ],
       },
@@ -443,7 +445,13 @@ export class SpacesService {
       }
     }
 
-    return savedSpace;
+    // Modify the response fields to exclude `is_deleted` and use camelCase
+    const { is_deleted, created_at, modified_at, ...rest } = savedSpace;
+    return {
+      ...rest,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
   async editSpace(
@@ -471,9 +479,15 @@ export class SpacesService {
     }
 
     space.name = updateSpaceDto.name ?? space.name;
-    await this.spacesRepository.save(space);
+    const updatedSpace = await this.spacesRepository.save(space);
 
-    return space;
+    // Modify the response fields to exclude `is_deleted` and use camelCase
+    const { is_deleted, created_at, modified_at, ...rest } = updatedSpace;
+    return {
+      ...rest,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
   async deleteSpace(userId: number, spaceId: number): Promise<any> {
@@ -497,9 +511,15 @@ export class SpacesService {
     }
 
     space.is_deleted = true;
-    await this.spacesRepository.save(space);
+    const deletedSpace = await this.spacesRepository.save(space);
 
-    return space;
+    // Modify the response fields to exclude `is_deleted` and use camelCase
+    const { is_deleted: _, created_at, modified_at, ...rest } = deletedSpace;
+    return {
+      ...rest,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
   async restoreSpace(userId: number, spaceId: number): Promise<any> {
@@ -523,9 +543,15 @@ export class SpacesService {
     }
 
     space.is_deleted = false;
-    await this.spacesRepository.save(space);
+    const restoredSpace = await this.spacesRepository.save(space);
 
-    return space;
+    // Modify the response fields to exclude `is_deleted` and use camelCase
+    const { is_deleted: _, created_at, modified_at, ...rest } = restoredSpace;
+    return {
+      ...rest,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
   async getSpaceParticipants(userId: number, spaceId: number): Promise<any> {

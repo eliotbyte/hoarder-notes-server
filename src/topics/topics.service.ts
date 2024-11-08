@@ -22,13 +22,13 @@ export class TopicsService {
     private readonly spacesService: SpacesService,
   ) {}
 
-  async createTopic(userId: number, createTopicDto: any): Promise<Topic> {
-    const { name, space_id } = createTopicDto;
+  async createTopic(userId: number, createTopicDto: any): Promise<any> {
+    const { name, spaceId } = createTopicDto;
 
     // Check if the user has permission to create topics in this space
     const hasPermission = await this.spacesService.hasPermission(
       userId,
-      space_id,
+      spaceId,
       'CREATE_TOPICS',
     );
 
@@ -41,7 +41,7 @@ export class TopicsService {
     // Create and save the topic
     const topic = this.topicsRepository.create({
       name,
-      space_id,
+      space_id: spaceId,
       is_deleted: false,
     });
 
@@ -49,7 +49,7 @@ export class TopicsService {
 
     // Get the 'owner' role in the space
     const ownerRole = await this.userRolesRepository.findOne({
-      where: { name: 'owner', space_id },
+      where: { name: 'owner', space_id: spaceId },
     });
 
     if (ownerRole) {
@@ -62,14 +62,22 @@ export class TopicsService {
       await this.topicUserRolesRepository.save(topicUserRole);
     }
 
-    return savedTopic;
+    // Map the response to change field names
+    const { space_id, is_deleted, created_at, modified_at, ...rest } =
+      savedTopic;
+    return {
+      ...rest,
+      spaceId: space_id,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
   async editTopic(
     userId: number,
     topicId: number,
     updateTopicDto: any,
-  ): Promise<Topic> {
+  ): Promise<any> {
     const topic = await this.topicsRepository.findOne({
       where: { id: topicId },
     });
@@ -94,10 +102,20 @@ export class TopicsService {
     // Update topic properties
     topic.name = updateTopicDto.name ?? topic.name;
 
-    return await this.topicsRepository.save(topic);
+    const updatedTopic = await this.topicsRepository.save(topic);
+
+    // Map the response fields
+    const { space_id, is_deleted, created_at, modified_at, ...rest } =
+      updatedTopic;
+    return {
+      ...rest,
+      spaceId: space_id,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 
-  async deleteTopic(userId: number, topicId: number): Promise<Topic> {
+  async deleteTopic(userId: number, topicId: number): Promise<any> {
     const topic = await this.topicsRepository.findOne({
       where: { id: topicId },
     });
@@ -122,6 +140,16 @@ export class TopicsService {
     // Mark the topic as deleted
     topic.is_deleted = true;
 
-    return await this.topicsRepository.save(topic);
+    const deletedTopic = await this.topicsRepository.save(topic);
+
+    // Map the response fields
+    const { space_id, is_deleted, created_at, modified_at, ...rest } =
+      deletedTopic;
+    return {
+      ...rest,
+      spaceId: space_id,
+      createdAt: created_at,
+      modifiedAt: modified_at,
+    };
   }
 }

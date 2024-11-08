@@ -19,7 +19,7 @@ export class TopicsController {
   @Post()
   async createTopic(
     @Req() req,
-    @Body() createTopicDto: { name: string; space_id: number },
+    @Body() createTopicDto: { name: string; spaceId: number },
   ) {
     const userId = req.user.userId;
     return this.topicsService.createTopic(userId, createTopicDto);

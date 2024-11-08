@@ -23,7 +23,7 @@ export class AuthService {
   async login(user: any) {
     const payload = { name: user.name, sub: user.id };
     return {
-      access_token: this.jwtService.sign(payload),
+      accessToken: this.jwtService.sign(payload),
     };
   }
 
@@ -34,9 +34,12 @@ export class AuthService {
         ...userData,
         password_hash: hashedPassword,
       });
-      const { password_hash, ...result } = user;
-      void password_hash;
-      return result;
+      const { password_hash, created_at, modified_at, ...rest } = user;
+      return {
+        ...rest,
+        createdAt: created_at,
+        modifiedAt: modified_at,
+      };
     } catch (error) {
       if (error.code === '23505') {
         throw new ConflictException('Username already exists');
