@@ -62,11 +62,11 @@ export class NotesController {
     const userId = req.user.userId;
     const filters = {
       date: query.date,
-      parentId: query.parentId ? Number(query.parentId) : undefined,
-      notReply: query.notReply === 'true',
+      parent_id: query.parent_id ? Number(query.parent_id) : undefined,
+      not_reply: query.not_reply === 'true',
       tags: query.tags ? query.tags.split(',') : [],
-      spaceId: query.space_id ? Number(query.space_id) : undefined,
-      topicId: query.topic_id ? Number(query.topic_id) : undefined,
+      space_id: query.space_id ? Number(query.space_id) : undefined,
+      topic_id: query.topic_id ? Number(query.topic_id) : undefined,
     };
     return this.notesService.getAllNotes(userId, filters);
   }
