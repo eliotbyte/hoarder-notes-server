@@ -237,100 +237,57 @@ export class NotesService {
         .andWhere('tag.name IN (:...tags)', { tags: filters.tags });
     }
 
-    if (filters.space_id) {
-      // Check if the user has 'READ_NOTES' permission in the specified space
-      const hasPermission = await this.spacesService.hasPermission(
-        userId,
-        filters.space_id,
-        'READ_NOTES',
+    // Check if the user has 'READ_NOTES' permission in the specified space
+    const hasPermission = await this.spacesService.hasPermission(
+      userId,
+      filters.space_id,
+      'READ_NOTES',
+    );
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to read notes in this space',
       );
+    }
 
-      if (!hasPermission) {
-        throw new ForbiddenException(
-          'You do not have permission to read notes in this space',
-        );
-      }
+    // Get the user's roles in the space
+    const userRoles = await this.spacesService.getUserRolesInSpace(
+      userId,
+      filters.space_id,
+    );
+    const roleIds = userRoles.map((role) => role.id);
 
-      // Get the user's roles in the space
-      const userRoles = await this.spacesService.getUserRolesInSpace(
-        userId,
-        filters.space_id,
-      );
-      const roleIds = userRoles.map((role) => role.id);
+    // Get topics the user has access to via topic_user_roles
+    const topicUserRoles = await this.topicUserRolesRepository.find({
+      where: { role_id: In(roleIds) },
+    });
+    let accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
 
-      // Get topics the user has access to via topic_user_roles
-      const topicUserRoles = await this.topicUserRolesRepository.find({
-        where: { role_id: In(roleIds) },
+    if (filters.topic_id) {
+      // Check if the topic is in the space and if the user has access to it
+      const topic = await this.topicsRepository.findOne({
+        where: { id: filters.topic_id, space_id: filters.space_id },
       });
-      let accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
-
-      if (filters.topic_id) {
-        // Check if the topic is in the space and if the user has access to it
-        const topic = await this.topicsRepository.findOne({
-          where: { id: filters.topic_id, space_id: filters.space_id },
-        });
-        if (!topic) {
-          throw new NotFoundException('Topic not found in the specified space');
-        }
-
-        if (!accessibleTopicIds.includes(filters.topic_id)) {
-          throw new ForbiddenException('You do not have access to this topic');
-        }
-
-        queryBuilder.andWhere('note.topic_id = :topicId', {
-          topicId: filters.topic_id,
-        });
-      } else {
-        // Filter notes by accessible topic IDs
-        if (accessibleTopicIds.length > 0) {
-          queryBuilder.andWhere('note.topic_id IN (:...topicIds)', {
-            topicIds: accessibleTopicIds,
-          });
-        } else {
-          // No accessible topics, return empty result
-          return [];
-        }
+      if (!topic) {
+        throw new NotFoundException('Topic not found in the specified space');
       }
+
+      if (!accessibleTopicIds.includes(filters.topic_id)) {
+        throw new ForbiddenException('You do not have access to this topic');
+      }
+
+      queryBuilder.andWhere('note.topic_id = :topicId', {
+        topicId: filters.topic_id,
+      });
     } else {
-      // No space_id specified
-      // Get the list of spaceIds where the user has 'READ_NOTES' permission
-      const userSpaces = await this.spacesService.getSpacesForUser(userId);
-      const spaceIdsWithReadPermission = userSpaces
-        .filter((space) => space.permissions.includes('read_notes'))
-        .map((space) => space.id);
-
-      if (spaceIdsWithReadPermission.length === 0) {
-        return [];
-      }
-
-      // Get the user's roles in these spaces
-      const userRolesInSpaces = await this.userSpaceRolesRepository.find({
-        where: { user_id: userId, space_id: In(spaceIdsWithReadPermission) },
-        relations: ['role'],
-      });
-      const roleIds = userRolesInSpaces.map((usr) => usr.role.id);
-
-      // Get topics that the user has access to via topic_user_roles
-      const topicUserRoles = await this.topicUserRolesRepository.find({
-        where: { role_id: In(roleIds) },
-      });
-      const accessibleTopicIds = topicUserRoles.map((tur) => tur.topic_id);
-
-      if (accessibleTopicIds.length === 0) {
-        return [];
-      }
-
-      if (filters.topic_id) {
-        if (!accessibleTopicIds.includes(filters.topic_id)) {
-          throw new ForbiddenException('You do not have access to this topic');
-        }
-        queryBuilder.andWhere('note.topic_id = :topicId', {
-          topicId: filters.topic_id,
-        });
-      } else {
+      // Filter notes by accessible topic IDs
+      if (accessibleTopicIds.length > 0) {
         queryBuilder.andWhere('note.topic_id IN (:...topicIds)', {
           topicIds: accessibleTopicIds,
         });
+      } else {
+        // No accessible topics, return empty result
+        return [];
       }
     }
 

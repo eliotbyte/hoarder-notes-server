@@ -9,6 +9,7 @@ import {
   Delete,
   Query,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -60,14 +61,21 @@ export class NotesController {
   @Get()
   async getAllNotes(@Req() req, @Query() query: any) {
     const userId = req.user.userId;
+
+    // Ensure space_id is provided
+    if (!query.space_id) {
+      throw new BadRequestException('space_id is a required parameter');
+    }
+
     const filters = {
       date: query.date,
       parent_id: query.parent_id ? Number(query.parent_id) : undefined,
       not_reply: query.not_reply === 'true',
       tags: query.tags ? query.tags.split(',') : [],
-      space_id: query.space_id ? Number(query.space_id) : undefined,
+      space_id: Number(query.space_id),
       topic_id: query.topic_id ? Number(query.topic_id) : undefined,
     };
+
     return this.notesService.getAllNotes(userId, filters);
   }
 }
