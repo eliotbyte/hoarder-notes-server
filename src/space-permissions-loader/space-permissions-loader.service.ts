@@ -32,7 +32,8 @@ export class SpacePermissionsLoaderService implements OnModuleInit {
         permission = this.spacePermissionRepository.create({
           name: lowerCaseName,
         });
-        await this.spacePermissionRepository.save(permission);
+        // Update the `permission` variable with the result of saving
+        permission = await this.spacePermissionRepository.save(permission);
       }
 
       // Set the ID into the constant
