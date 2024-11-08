@@ -396,7 +396,7 @@ export class SpacesService {
           'READ_NOTES',
           'CREATE_TOPICS',
           'EDIT_TOPICS',
-          'DELETE_TOPics',
+          'DELETE_TOPICS',
           // Add other permissions as needed
         ],
       },
@@ -407,7 +407,7 @@ export class SpacesService {
         permissions: [
           'CREATE_NOTES',
           'EDIT_NOTES',
-          'DELETE_NOTes',
+          'DELETE_NOTES',
           'READ_NOTES',
         ],
       },
