@@ -62,7 +62,7 @@ export class NotesController {
   async getAllNotes(@Req() req, @Query() query: any) {
     const userId = req.user.userId;
 
-    // Ensure space_id is provided
+    // Ensure spaceId is provided
     if (!query.spaceId) {
       throw new BadRequestException('spaceId is a required parameter');
     }
@@ -74,6 +74,8 @@ export class NotesController {
       tags: query.tags ? query.tags.split(',') : [],
       spaceId: Number(query.spaceId),
       topicId: query.topicId ? Number(query.topicId) : undefined,
+      page: query.page ? Number(query.page) : 1,
+      pageSize: query.pageSize ? Number(query.pageSize) : 10,
     };
 
     return this.notesService.getAllNotes(userId, filters);

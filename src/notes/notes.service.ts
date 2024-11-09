@@ -211,7 +211,7 @@ export class NotesService {
     return null;
   }
 
-  async getAllNotes(userId: number, filters: any): Promise<any[]> {
+  async getAllNotes(userId: number, filters: any): Promise<any> {
     const queryBuilder = this.notesRepository.createQueryBuilder('note');
 
     queryBuilder.where('note.is_deleted = false');
@@ -287,11 +287,24 @@ export class NotesService {
         });
       } else {
         // No accessible topics, return empty result
-        return [];
+        return {
+          data: [],
+          total: 0,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        };
       }
     }
 
-    const notes = await queryBuilder.getMany();
+    const page = filters.page || 1;
+    const pageSize = filters.pageSize || 10;
+
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+
+    queryBuilder.skip(skip).take(take);
+
+    const [notes, total] = await queryBuilder.getManyAndCount();
 
     const notesWithDetails = [];
 
@@ -300,7 +313,12 @@ export class NotesService {
       notesWithDetails.push(noteDetails);
     }
 
-    return notesWithDetails;
+    return {
+      data: notesWithDetails,
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async handleTags(noteId: number, tags: string[]) {
