@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Note } from '../entities/note.entity';
@@ -31,9 +32,36 @@ export class NotesService {
   async createNote(userId: number, createNoteDto: any): Promise<any> {
     const { text, tags = [], parentId = null, topicId } = createNoteDto;
 
+    let finalTopicId = topicId;
+
+    if (parentId) {
+      // Get the parent note to retrieve topicId if not provided
+      const parentNote = await this.notesRepository.findOne({
+        where: { id: parentId },
+      });
+
+      if (!parentNote) {
+        throw new NotFoundException('Parent note not found');
+      }
+
+      if (!finalTopicId) {
+        finalTopicId = parentNote.topic_id;
+      } else if (finalTopicId !== parentNote.topic_id) {
+        throw new BadRequestException(
+          'Provided topicId does not match parent note topic',
+        );
+      }
+    }
+
+    if (!finalTopicId) {
+      throw new BadRequestException(
+        'topicId is required when parentId is not provided',
+      );
+    }
+
     // Fetch the topic
     const topic = await this.topicsRepository.findOne({
-      where: { id: topicId },
+      where: { id: finalTopicId },
     });
 
     if (!topic) {
@@ -57,7 +85,7 @@ export class NotesService {
       text,
       parent_id: parentId,
       user_id: userId,
-      topic_id: topicId,
+      topic_id: finalTopicId,
     });
     const savedNote = await this.notesRepository.save(note);
 
@@ -235,6 +263,32 @@ export class NotesService {
         .innerJoin('note_tags', 'nt', 'nt.note_id = note.id')
         .innerJoin('tags', 'tag', 'tag.id = nt.tag_id')
         .andWhere('tag.name IN (:...tags)', { tags: filters.tags });
+    }
+
+    // If spaceId is not provided but parentId is provided, get spaceId from parent note
+    if (!filters.spaceId && filters.parentId) {
+      const parentNote = await this.notesRepository.findOne({
+        where: { id: filters.parentId },
+        relations: ['topic'],
+      });
+
+      if (!parentNote) {
+        throw new NotFoundException('Parent note not found');
+      }
+
+      const topic = await this.topicsRepository.findOne({
+        where: { id: parentNote.topic_id },
+      });
+
+      if (!topic) {
+        throw new NotFoundException('Topic not found for parent note');
+      }
+
+      filters.spaceId = topic.space_id;
+    } else if (!filters.spaceId) {
+      throw new BadRequestException(
+        'spaceId is required when parentId is not provided',
+      );
     }
 
     // Check if the user has 'READ_NOTES' permission in the specified space
