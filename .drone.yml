@@ -17,14 +17,6 @@ steps:
       - npm install
       - npm run build
 
-  # Optional step: you can run tests
-  # - name: test
-  #   image: node:18-alpine
-  #   commands:
-  #     - npm install
-  #     - npm run test
-  # test
-
   # Docker image build step
   - name: docker_build
     image: plugins/docker
@@ -39,19 +31,17 @@ steps:
       branch: [ main ]
       event: [ push ]
 
-  # Deployment step on the server (if your Runner is on the same machine as production):
+  # Deployment step on the server
   - name: deploy
-    image: docker:20-dind
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
-    environment:
-      JWT_SECRET:
-        from_secret: jwt_secret
-    commands:
-      # Pull the latest image and restart the service
-      - docker-compose pull app
-      - docker-compose up -d app
+    image: appleboy/ssh-action
+    settings:
+      host: ${DEPLOY_SERVER_IP}
+      username: ${DEPLOY_SERVER_USER}
+      password: ${DEPLOY_SERVER_PASSWORD} # Или используйте ssh_key для ключа
+      script: |
+        cd ${DEPLOY_PROJECT_PATH}  # Используем путь из секретов
+        docker-compose pull app    # Скачиваем последний образ
+        docker-compose up -d app   # Перезапускаем приложение
 
 volumes:
   - name: dockersock
