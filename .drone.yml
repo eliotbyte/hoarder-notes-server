@@ -33,7 +33,7 @@ steps:
 
   # Deployment step on the server
   - name: deploy
-    image: appleboy/ssh-action
+    image: appleboy/drone-ssh
     settings:
       host: ${DEPLOY_SERVER_IP}
       username: ${DEPLOY_SERVER_USER}
