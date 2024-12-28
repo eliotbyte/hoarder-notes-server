@@ -34,6 +34,8 @@ steps:
       username: ${DEPLOY_SERVER_USER}
       password: ${DEPLOY_SERVER_PASSWORD} # Или используйте ssh_key для ключа
       script: |
+        echo "DEPLOY_SERVER_IP: ${DEPLOY_SERVER_IP}"
+        echo "DEPLOY_PROJECT_PATH: ${DEPLOY_PROJECT_PATH}"
         cd ${DEPLOY_PROJECT_PATH}  # Используем путь из секретов
         docker-compose pull app    # Скачиваем последний образ
         docker-compose up -d app   # Перезапускаем приложение
