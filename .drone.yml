@@ -1,0 +1,59 @@
+kind: pipeline
+type: docker
+name: default
+
+# Triggers: run the pipeline on push to the main branch
+trigger:
+  branch:
+    - main
+  event:
+    - push
+    - custom  # Support for manual triggers
+
+steps:
+  - name: build
+    image: node:18-alpine
+    commands:
+      - npm install
+      - npm run build
+
+  # Optional step: you can run tests
+  # - name: test
+  #   image: node:18-alpine
+  #   commands:
+  #     - npm install
+  #     - npm run test
+  # test
+
+  # Docker image build step
+  - name: docker_build
+    image: plugins/docker
+    settings:
+      repo: your-docker-registry/hoarder-notes-server
+      tags: latest
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      branch: [ main ]
+      event: [ push ]
+
+  # Deployment step on the server (if your Runner is on the same machine as production):
+  - name: deploy
+    image: docker:20-dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      JWT_SECRET:
+        from_secret: jwt_secret
+    commands:
+      # Pull the latest image and restart the service
+      - docker-compose pull app
+      - docker-compose up -d app
+
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
