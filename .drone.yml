@@ -19,17 +19,12 @@ steps:
 
   # Docker image build step
   - name: docker_build
-    image: plugins/docker
-    settings:
-      repo: your-docker-registry/hoarder-notes-server
-      tags: latest
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-    when:
-      branch: [ main ]
-      event: [ push ]
+    image: docker:20-dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t hoarder-notes-api .
 
   # Deployment step on the server
   - name: deploy
