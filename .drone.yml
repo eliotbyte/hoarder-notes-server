@@ -38,6 +38,7 @@ steps:
         from_secret: DEPLOY_SERVER_PASSWORD
       script: |
         cd ${DEPLOY_PROJECT_PATH}  # Используем путь из секретов
+        ls -la  # <-- посмотреть, есть ли тут docker-compose.yml
         docker-compose pull app    # Скачиваем последний образ
         docker-compose up -d app   # Перезапускаем приложение
 
