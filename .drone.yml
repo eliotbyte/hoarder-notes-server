@@ -30,12 +30,13 @@ steps:
   - name: deploy
     image: appleboy/drone-ssh
     settings:
-      host: ${DEPLOY_SERVER_IP}
-      username: ${DEPLOY_SERVER_USER}
-      password: ${DEPLOY_SERVER_PASSWORD} # Или используйте ssh_key для ключа
+      host:
+        from_secret: DEPLOY_SERVER_IP
+      username:
+        from_secret: DEPLOY_SERVER_USER
+      password:
+        from_secret: DEPLOY_SERVER_PASSWORD
       script: |
-        echo "DEPLOY_SERVER_IP: ${DEPLOY_SERVER_IP}"
-        echo "DEPLOY_PROJECT_PATH: ${DEPLOY_PROJECT_PATH}"
         cd ${DEPLOY_PROJECT_PATH}  # Используем путь из секретов
         docker-compose pull app    # Скачиваем последний образ
         docker-compose up -d app   # Перезапускаем приложение
