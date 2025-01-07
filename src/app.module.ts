@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
@@ -11,17 +11,21 @@ import { TopicsModule } from './topics/topics.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // Make ConfigModule global
+      isGlobal: true,
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: 'db', // Use 'db' as the host since it's the service name in docker-compose
-      port: 5432,
-      username: 'postgres',
-      password: 'postgres',
-      database: 'hoarder_notes_db',
-      entities: [join(__dirname, '**', '*.entity.{ts,js}')],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get<string>('DB_HOST', 'db'),
+        port: configService.get<number>('DB_PORT', 5432),
+        username: configService.get<string>('POSTGRES_USER', 'postgres'),
+        password: configService.get<string>('POSTGRES_PASSWORD', 'postgres'),
+        database: configService.get<string>('POSTGRES_DB', 'hoarder_notes_db'),
+        entities: [join(__dirname, '**', '*.entity.{ts,js}')],
+        synchronize: true,
+      }),
+      inject: [ConfigService],
     }),
     AuthModule,
     NotesModule,
