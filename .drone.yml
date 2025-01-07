@@ -8,7 +8,19 @@ steps:
     image: docker:23
     environment:
       APP_PORT:
-        from_secret: APP_PORT  # get secret
+        from_secret: APP_PORT
+      JWT_SECRET:
+        from_secret: JWT_SECRET
+      POSTGRES_USER:
+        from_secret: POSTGRES_USER
+      POSTGRES_PASSWORD:
+        from_secret: POSTGRES_PASSWORD
+      POSTGRES_DB:
+        from_secret: POSTGRES_DB
+      DB_PORT:
+        from_secret: DB_PORT
+      POSTGRES_DATA_PATH:
+        from_secret: POSTGRES_DATA_PATH
     volumes:
       - name: docker_socket
         path: /var/run/docker.sock
@@ -20,7 +32,19 @@ steps:
     image: docker:23
     environment:
       APP_PORT:
-        from_secret: APP_PORT  # get secret
+        from_secret: APP_PORT
+      JWT_SECRET:
+        from_secret: JWT_SECRET
+      POSTGRES_USER:
+        from_secret: POSTGRES_USER
+      POSTGRES_PASSWORD:
+        from_secret: POSTGRES_PASSWORD
+      POSTGRES_DB:
+        from_secret: POSTGRES_DB
+      DB_PORT:
+        from_secret: DB_PORT
+      POSTGRES_DATA_PATH:
+        from_secret: POSTGRES_DATA_PATH
     volumes:
       - name: docker_socket
         path: /var/run/docker.sock
@@ -37,7 +61,19 @@ steps:
     image: docker:23
     environment:
       APP_PORT:
-        from_secret: APP_PORT  # get secret
+        from_secret: APP_PORT
+      JWT_SECRET:
+        from_secret: JWT_SECRET
+      POSTGRES_USER:
+        from_secret: POSTGRES_USER
+      POSTGRES_PASSWORD:
+        from_secret: POSTGRES_PASSWORD
+      POSTGRES_DB:
+        from_secret: POSTGRES_DB
+      DB_PORT:
+        from_secret: DB_PORT
+      POSTGRES_DATA_PATH:
+        from_secret: POSTGRES_DATA_PATH
     volumes:
       - name: docker_socket
         path: /var/run/docker.sock
