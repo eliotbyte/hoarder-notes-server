@@ -1,37 +1,25 @@
 kind: pipeline
 type: docker
-name: default
+name: build_and_deploy
 
-# Triggers: run the pipeline on push to the main branch
+steps:
+  - name: docker_compose_build_and_up
+    image: docker:23
+    volumes:
+      - name: docker_socket
+        path: /var/run/docker.sock
+    commands:
+      - docker-compose build
+      - docker-compose up -d
+
+volumes:
+  - name: docker_socket
+    host:
+      path: /var/run/docker.sock
+
 trigger:
   branch:
     - main
   event:
     - push
-    - custom  # Support for manual triggers
-
-steps:
-  - name: build
-    image: node:18-alpine
-    commands:
-      - npm install
-      - npm run build
-
-  # Portainer deployment step
-  - name: deploy_to_portainer
-    image: robkaandorp/drone-portainer
-    settings:
-      portainer_url:
-        from_secret: PORTAINER_URL
-      portainer_username:
-        from_secret: PORTAINER_USERNAME
-      portainer_password:
-        from_secret: PORTAINER_PASSWORD
-      endpoint: local
-      stack_name: hoarder-notes-stack
-      compose_file: docker-compose.yml
-
-secrets:
-  - PORTAINER_URL
-  - PORTAINER_USERNAME
-  - PORTAINER_PASSWORD
+    - custom
