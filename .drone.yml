@@ -17,32 +17,21 @@ steps:
       - npm install
       - npm run build
 
-  # Docker image build step
-  - name: docker_build
-    image: docker:20-dind
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
-    commands:
-      - docker build -t hoarder-notes-api .
-
-  # Deployment step on the server
-  - name: deploy
-    image: appleboy/drone-ssh
+  # Portainer deployment step
+  - name: deploy_to_portainer
+    image: robkaandorp/drone-portainer
     settings:
-      host:
-        from_secret: DEPLOY_SERVER_IP
-      username:
-        from_secret: DEPLOY_SERVER_USER
-      password:
-        from_secret: DEPLOY_SERVER_PASSWORD
-      script: |
-        cd ${DEPLOY_PROJECT_PATH}  # Используем путь из секретов
-        ls -la  # <-- посмотреть, есть ли тут docker-compose.yml
-        docker-compose pull app    # Скачиваем последний образ
-        docker-compose up -d app   # Перезапускаем приложение
+      portainer_url:
+        from_secret: PORTAINER_URL
+      portainer_username:
+        from_secret: PORTAINER_USERNAME
+      portainer_password:
+        from_secret: PORTAINER_PASSWORD
+      endpoint: local
+      stack_name: hoarder-notes-stack
+      compose_file: docker-compose.yml
 
-volumes:
-  - name: dockersock
-    host:
-      path: /var/run/docker.sock
+secrets:
+  - PORTAINER_URL
+  - PORTAINER_USERNAME
+  - PORTAINER_PASSWORD
