@@ -3,13 +3,45 @@ type: docker
 name: build_and_deploy
 
 steps:
-  - name: docker_compose_build_and_up
+  # STEP 1: Build images using docker-compose build
+  - name: docker_compose_build
     image: docker:23
+    environment:
+      APP_PORT:
+        from_secret: APP_PORT  # get secret
     volumes:
       - name: docker_socket
         path: /var/run/docker.sock
     commands:
       - docker-compose build
+
+  # STEP 2: Start the database separately, run the app once for migrations, and then shut everything down
+  - name: run_migrations
+    image: docker:23
+    environment:
+      APP_PORT:
+        from_secret: APP_PORT  # get secret
+    volumes:
+      - name: docker_socket
+        path: /var/run/docker.sock
+    commands:
+      # 2.1. Start only the db
+      - docker-compose up -d db
+      # 2.2. Run migrations: start the app container in one-off mode using `run --rm`
+      - docker-compose run --rm app npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./data-source.ts
+      # 2.3. After running migrations, shut everything down to start fresh in the next step
+      - docker-compose down
+
+  # STEP 3: Now start the full application (db + app)
+  - name: docker_compose_up
+    image: docker:23
+    environment:
+      APP_PORT:
+        from_secret: APP_PORT  # get secret
+    volumes:
+      - name: docker_socket
+        path: /var/run/docker.sock
+    commands:
       - docker-compose up -d
 
 volumes:
