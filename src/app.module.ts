@@ -23,7 +23,7 @@ import { TopicsModule } from './topics/topics.module';
         password: configService.get<string>('POSTGRES_PASSWORD', 'postgres'),
         database: configService.get<string>('POSTGRES_DB', 'hoarder_notes_db'),
         entities: [join(__dirname, '**', '*.entity.{ts,js}')],
-        synchronize: true,
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
